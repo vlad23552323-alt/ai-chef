@@ -76,22 +76,23 @@ def get_gigachat_token(auth_key: str) -> str:
     return r.json()["access_token"]
 
 def find_dish_photo(keyword: str) -> str:
-    w = "https://" + "upload.wikimedia.org/wikipedia/commons/thumb/"
+    p = "https://" + "://pexels.com"
+    q = "?auto=compress&cs=tinysrgb&w=800"
     photos = {
-        "chicken": w + "6/6d/Good_Food_Display_-_NCI_Visuals_Online.jpg/800px-Good_Food_Display_-_NCI_Visuals_Online.jpg",
-        "beef": w + "6/60/Roast_beef_with_vegetables.jpg/800px-Roast_beef_with_vegetables.jpg",
-        "steak": w + "2/2b/Beef_fillet_steak_with_mushrooms.jpg/800px-Beef_fillet_steak_with_mushrooms.jpg",
-        "pasta": w + "3/3f/%28Pasta%29_by_David_Adam_Kess_%28pic.2%29.jpg/800px-%28Pasta%29_by_David_Adam_Kess_%28pic.2%29.jpg",
-        "salad": w + "9/94/Salad_platter.jpg/800px-Salad_platter.jpg",
-        "lasagna": w + "b/ba/Lasagne_-_stonesoup.jpg/800px-Lasagne_-_stonesoup.jpg",
-        "fish": w + "e/e6/Penne_arrabbiata.jpg/800px-Penne_arrabbiata.jpg"
+        "chicken": p + "2338407/pexels-photo-2338407.jpeg" + q,
+        "beef": p + "769289/pexels-photo-769289.jpeg" + q,
+        "steak": p + "3535383/pexels-photo-3535383.jpeg" + q,
+        "pasta": p + "1279330/pexels-photo-1279330.jpeg" + q,
+        "salad": p + "1059905/pexels-photo-1059905.jpeg" + q,
+        "lasagna": p + "4079520/pexels-photo-4079520.jpeg" + q,
+        "fish": p + "262959/pexels-photo-262959.jpeg" + q
     }
     kw = keyword.lower()
     for key, url in photos.items():
         if key in kw:
             return url
-    return photos["chicken"]
-def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
+    return photos["beef"]
+    def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
