@@ -96,7 +96,8 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
         "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
-        "Оформи ответ строго обычным текстом без символов # и * по меткам:\nTITLE: Название блюда\nKEYWORD: 1 слово на английском (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
+        "Оформи ответ строго с новой строки для каждой метки без символов # и *:\n"
+        "TITLE: Название блюда\nKEYWORD: 1 слово на английском (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
         "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
     )
@@ -121,19 +122,31 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     }
     mode = None
     for line in text.splitlines():
-        s = line.strip().lstrip("#* ")
-        if not s: continue
-        if s.startswith("TITLE:"): data["title"] = s[6:].strip().strip('"«»*')
-        elif s.startswith("KEYWORD:"): data["keyword"] = s[8:].strip().strip('*')
-        elif s.startswith("TIME:"): data["time"] = s[5:].strip().strip('*')
-        elif s.startswith("DIFF:"): data["diff"] = s[5:].strip().strip('*')
-        elif s.startswith("CAL:"): data["cal"] = s[4:].strip().strip('*')
-        elif s.startswith("MACROS:"): data["macros"] = s[7:].strip().strip('*')
-        elif s.startswith("TIP:"): data["tip"] = s[4:].strip().strip('*')
-        elif s.startswith("INGREDIENTS:"): mode = "ing"
-        elif s.startswith("STEPS:"): mode = "step"
-        elif mode == "ing": data["ings"].append(s.lstrip("-•* ").strip())
-        elif mode == "step": data["steps"].append(s.lstrip("0123456789.) ").strip())
+        s = line.strip().lstrip("#* ").rstrip("*")
+        if not s:
+            continue
+        if "TITLE:" in s:
+            data["title"] = s.split("TITLE:", 1).pop().strip().strip('"«»*')
+        elif "KEYWORD:" in s:
+            data["keyword"] = s.split("KEYWORD:", 1).pop().strip().strip('*')
+        elif "TIME:" in s:
+            data["time"] = s.split("TIME:", 1).pop().strip().strip('*')
+        elif "DIFF:" in s:
+            data["diff"] = s.split("DIFF:", 1).pop().strip().strip('*')
+        elif "CAL:" in s:
+            data["cal"] = s.split("CAL:", 1).pop().strip().strip('*')
+        elif "MACROS:" in s:
+            data["macros"] = s.split("MACROS:", 1).pop().strip().strip('*')
+        elif "TIP:" in s:
+            data["tip"] = s.split("TIP:", 1).pop().strip().strip('*')
+        elif "INGREDIENTS:" in s:
+            mode = "ing"
+        elif "STEPS:" in s:
+            mode = "step"
+        elif mode == "ing":
+            data["ings"].append(s.lstrip("-•* ").strip())
+        elif mode == "step":
+            data["steps"].append(s.lstrip("0123456789.) ").strip())
 
     if not data["steps"]:
         data["steps"] = [text]
