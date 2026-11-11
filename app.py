@@ -14,12 +14,22 @@ st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layou
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #0b0f19 0%, #17153b 50%, #090d16 100%);
+    background: radial-gradient(circle at 15% 20%, #2a1b3d 0%, transparent 45%),
+                radial-gradient(circle at 85% 80%, #162447 0%, transparent 45%),
+                #0d111a;
     color: #f8fafc;
 }
 [data-testid="stSidebar"] {
     background-color: rgba(11, 15, 25, 0.85);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: rgba(26, 32, 48, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(10px);
 }
 div.stButton > button[kind="primary"] {
     background: linear-gradient(90deg, #ff6b35 0%, #f72585 100%);
@@ -227,4 +237,11 @@ with col2:
             txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
             st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
         else:
-            st.info("👈 Выберите продукты, вставьте ключ слева и нажмите кнопку.")
+                     st.markdown("""
+            ### 👋 Добро пожаловать на кухню ИИ-Шефа!
+            Чтобы получить персональный рецепт, сделайте три простых шага:
+            1. **Отметьте продукты** в меню слева или впишите свои через запятую.
+            2. **Укажите пожелания** (например: *ПП*, *без духовки*, *на скорую руку*).
+            3. **Нажмите «Придумать рецепт»** — нейросеть рассчитает калории, распишет шаги и подберет фото готового блюда.
+            """)
+                st.info("💡 Все сгенерированные блюда сохраняются в левой боковой панели — к ним можно вернуться в любой момент.")  
