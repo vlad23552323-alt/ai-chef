@@ -63,6 +63,7 @@ API_URL = "https://" + "gigachat.devices.sberbank.ru" + "/api/v1/chat/completion
 if "history" not in st.session_state:
     st.session_state.history = []
 
+@st.cache_data(ttl=1500, show_spinner=False)
 def get_gigachat_token(auth_key: str) -> str:
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -91,15 +92,18 @@ def find_dish_photo(keyword: str) -> str:
         if key in kw:
             return url
     return photos["beef"]
-def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
+def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
+    sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай максимальный акцент на высоком содержании белка, минимуме жиров/масла и точном подсчете граммов белка на порцию. " if sport_mode else ""
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
+        f"{sport_rule}"
         "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
         "Оформи ответ строго с новой строки для каждой метки без символов # и *:\n"
         "TITLE: Название блюда\nKEYWORD: 1 слово на английском (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
         "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
-        "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
+        "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа\n"
+        "PAIRING: Идеальный соус, гарнир или напиток к этому блюду"
     )
     avoid_text = f" Не повторяй эти блюда: {', '.join(past_titles)}." if past_titles else ""
     usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}.{avoid_text}"
@@ -118,35 +122,26 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     text = r.json()["choices"].pop(0)["message"]["content"]
     data = {
         "title": "Блюдо от шефа", "keyword": "chicken", "time": time_lim,
-        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано", "ings": [], "steps": [], "tip": "", "photo": ""
+        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано",
+        "ings": [], "steps": [], "tip": "", "pairing": "", "photo": ""
     }
     mode = None
     for line in text.splitlines():
         s = line.strip().lstrip("#* ").rstrip("*")
         if not s:
             continue
-        if "TITLE:" in s:
-            data["title"] = s.split("TITLE:", 1).pop().strip().strip('"«»*')
-        elif "KEYWORD:" in s:
-            data["keyword"] = s.split("KEYWORD:", 1).pop().strip().strip('*')
-        elif "TIME:" in s:
-            data["time"] = s.split("TIME:", 1).pop().strip().strip('*')
-        elif "DIFF:" in s:
-            data["diff"] = s.split("DIFF:", 1).pop().strip().strip('*')
-        elif "CAL:" in s:
-            data["cal"] = s.split("CAL:", 1).pop().strip().strip('*')
-        elif "MACROS:" in s:
-            data["macros"] = s.split("MACROS:", 1).pop().strip().strip('*')
-        elif "TIP:" in s:
-            data["tip"] = s.split("TIP:", 1).pop().strip().strip('*')
-        elif "INGREDIENTS:" in s:
-            mode = "ing"
-        elif "STEPS:" in s:
-            mode = "step"
-        elif mode == "ing":
-            data["ings"].append(s.lstrip("-•* ").strip())
-        elif mode == "step":
-            data["steps"].append(s.lstrip("0123456789.) ").strip())
+        if "TITLE:" in s: data["title"] = s.split("TITLE:", 1).pop().strip().strip('"«»*')
+        elif "KEYWORD:" in s: data["keyword"] = s.split("KEYWORD:", 1).pop().strip().strip('*')
+        elif "TIME:" in s: data["time"] = s.split("TIME:", 1).pop().strip().strip('*')
+        elif "DIFF:" in s: data["diff"] = s.split("DIFF:", 1).pop().strip().strip('*')
+        elif "CAL:" in s: data["cal"] = s.split("CAL:", 1).pop().strip().strip('*')
+        elif "MACROS:" in s: data["macros"] = s.split("MACROS:", 1).pop().strip().strip('*')
+        elif "TIP:" in s: data["tip"] = s.split("TIP:", 1).pop().strip().strip('*')
+        elif "PAIRING:" in s: data["pairing"] = s.split("PAIRING:", 1).pop().strip().strip('*')
+        elif "INGREDIENTS:" in s: mode = "ing"
+        elif "STEPS:" in s: mode = "step"
+        elif mode == "ing": data["ings"].append(s.lstrip("-•* ").strip())
+        elif mode == "step": data["steps"].append(s.lstrip("0123456789.) ").strip())
 
     if not data["steps"]:
         data["steps"] = [text]
@@ -167,7 +162,7 @@ with st.sidebar:
                 st.session_state.current = item
 
 st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов")
-st.caption("Умный подбор блюд из ваших продуктов с расчетом КБЖУ и визуализацией")
+st.caption("Умный подбор блюд из ваших продуктов с расчетом КБЖУ, спорт-режимом и визуализацией")
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
@@ -198,13 +193,18 @@ with col1:
         c1, c2 = st.columns(2)
         meal = c1.selectbox("Прием пищи:", ["Любой", "Завтрак", "Обед", "Ужин", "Перекус"])
         time_lim = c2.selectbox("Время:", ["Не важно", "До 15 мин", "До 30 мин", "До 1 часа"])
-        wishes = st.text_input("✨ Пожелания (ПП, без жарки и т.д.):")
+        sport_mode = st.toggle("💪 Спортивное / Белковое меню (высокий белок)")
+        wishes = st.text_input("✨ Пожелания (без жарки, острое и т.д.):")
         btn = st.button("🔥 Придумать рецепт", type="primary", use_container_width=True)
 
 with col2:
     with st.container(border=True):
         st.subheader("🍽️ Готовый рецепт")
-        if btn:
+        regen = False
+        if "current" in st.session_state:
+            regen = st.button("🔄 Другой вариант из этих же продуктов", use_container_width=True)
+
+        if btn or regen:
             if not api_key:
                 st.error("⚠️ Введите Authorization Key в меню слева!")
             elif not selected:
@@ -213,9 +213,10 @@ with col2:
                 with st.spinner("Шеф-повар готовит рецепт..."):
                     try:
                         past = [item["title"] for item in st.session_state.history]
-                        res = fetch_recipe(api_key, selected, meal, time_lim, wishes, past)
+                        res = fetch_recipe(api_key, selected, meal, time_lim, wishes, sport_mode, past)
                         st.session_state.history.append(res)
                         st.session_state.current = res
+                        st.rerun()
                     except Exception as e:
                         st.error(f"🚨 Ошибка: {e}")
 
@@ -232,22 +233,24 @@ with col2:
             st.caption(f"**БЖУ:** {rec['macros']}")
             st.divider()
 
-            st.markdown("### 🛒 Ингредиенты:")
-            for ing in rec["ings"]:
-                st.markdown(f"- {ing}")
+            st.markdown("### 🛒 Ингредиенты (отмечайте при готовке):")
+            for i, ing in enumerate(rec["ings"]):
+                st.checkbox(ing, key=f"ing_{rec['title']}_{i}")
 
             st.markdown("### 👨‍🍳 Приготовление:")
             for i, step in enumerate(rec["steps"], 1):
-                st.markdown(f"**{i}.** {step}")
+                st.checkbox(f"**Шаг {i}.** {step}", key=f"step_{rec['title']}_{i}")
 
-            if rec["tip"]:
+            if rec.get("tip"):
                 st.success(f"💡 **Совет шефа:** {rec['tip']}")
+            if rec.get("pairing"):
+                st.info(f"🍷 **Идеальное дополнение:** {rec['pairing']}")
 
             txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
             st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
         else:
             st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
             st.write("1. Отметьте продукты в меню слева или впишите свои через запятую.")
-            st.write("2. Укажите пожелания (например: *ПП*, *без духовки*, *на скорую руку*).")
-            st.write("3. Нажмите **«Придумать рецепт»** — нейросеть рассчитает КБЖУ, распишет шаги и подберет фото.")
+            st.write("2. При необходимости включите **Спортивное меню** с повышенным белком.")
+            st.write("3. Нажмите **«Придумать рецепт»** — нейросеть рассчитает КБЖУ, подберет напиток и распишет шаги.")
             st.info("💡 Все сгенерированные блюда сохраняются в левой панели — к ним можно вернуться в любой момент.")
