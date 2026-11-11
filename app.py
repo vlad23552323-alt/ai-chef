@@ -3,6 +3,7 @@ import requests
 import uuid
 import urllib.parse
 import urllib3
+import random
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
@@ -44,6 +45,8 @@ div.stButton > button[kind="primary"]:hover {
 [data-testid="stImage"] img {
     border-radius: 16px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    max-height: 420px;
+    object-fit: cover;
 }
 [data-testid="stMetric"] {
     background: rgba(255, 255, 255, 0.04);
@@ -73,12 +76,33 @@ def get_gigachat_token(auth_key: str) -> str:
         raise ValueError(f"Ошибка авторизации Сбера (код {r.status_code}). Проверьте ключ и пакет токенов.")
     return r.json()["access_token"]
 
+def find_dish_photo(keyword: str) -> str:
+    """Ищет реальное фото блюда по ключевому слову в открытой кулинарной базе."""
+    base_api = "https://" + "://themealdb.com" + "/api/json/v1/1/search.php?s="
+    for word in keyword.replace(",", " ").split():
+        if len(word) > 2:
+            try:
+                resp = requests.get(base_api + urllib.parse.quote(word), timeout=5).json()
+                if resp.get("meals"):
+                    return random.choice(resp["meals"])["strMealThumb"]
+            except Exception:
+                pass
+    # Запасной вариант — случайное аппетитное блюдо из той же базы
+    try:
+        rand_url = "https://" + "://themealdb.com" + "/api/json/v1/1/random.php"
+        resp = requests.get(rand_url, timeout=5).json()
+        if resp.get("meals"):
+            return resp["meals"].pop(0)["strMealThumb"]
+    except Exception:
+        pass
+    return ""
+
 def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
-        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
-        "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 2-3 слова на английском для фото блюда\n"
+        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
+        "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 1 главное слово на английском (например: lasagna, chicken, beef, pasta, soup, salad)\n"
         "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
     )
@@ -98,8 +122,8 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
 
     text = r.json()["choices"].pop(0)["message"]["content"]
     data = {
-        "title": "Блюдо от шефа", "keyword": "delicious food", "time": time_lim,
-        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано", "ings": [], "steps": [], "tip": ""
+        "title": "Блюдо от шефа", "keyword": "chicken", "time": time_lim,
+        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано", "ings": [], "steps": [], "tip": "", "photo": ""
     }
     mode = None
     for line in text.splitlines():
@@ -119,6 +143,7 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
 
     if not data["steps"]:
         data["steps"] = [text]
+    data["photo"] = find_dish_photo(data["keyword"])
     return data
 
 with st.sidebar:
@@ -190,30 +215,10 @@ with col2:
         if "current" in st.session_state:
             rec = st.session_state.current
             st.markdown(f"## {rec['title']}")
-            kw = urllib.parse.quote(f"delicious {rec['keyword']}, professional food photography, appetizing, 4k")
-            img_url = "https://" + "image.pollinations.ai/prompt/" + kw + "?width=800&height=450&nologo=true"
-            st.image(img_url, use_container_width=True)
+            if rec.get("photo"):
+                st.image(rec["photo"], use_container_width=True)
 
             m1, m2, m3 = st.columns(3)
             m1.metric("⏱️ Время", rec["time"])
             m2.metric("📊 Сложность", rec["diff"])
             m3.metric("🔥 Калории", rec["cal"])
-            st.caption(f"**БЖУ:** {rec['macros']}")
-            st.divider()
-
-            st.markdown("### 🛒 Ингредиенты:")
-            for ing in rec["ings"]:
-                st.markdown(f"- {ing}")
-
-            st.markdown("### 👨‍🍳 Приготовление:")
-            for i, step in enumerate(rec["steps"], 1):
-                st.markdown(f"**{i}.** {step}")
-
-            if rec["tip"]:
-                st.success(f"💡 **Совет шефа:** {rec['tip']}")
-
-            txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
-            st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
-        else:
-            st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
-            st.write("1. Отметьте продукты в меню слева или впишите свои через запятую.")
