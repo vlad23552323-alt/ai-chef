@@ -1,9 +1,7 @@
 import streamlit as st
 import requests
 import uuid
-import urllib.parse
 import urllib3
-import random
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
@@ -45,7 +43,8 @@ div.stButton > button[kind="primary"]:hover {
 [data-testid="stImage"] img {
     border-radius: 16px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    max-height: 420px;
+    max-height: 400px;
+    width: 100%;
     object-fit: cover;
 }
 [data-testid="stMetric"] {
@@ -77,29 +76,27 @@ def get_gigachat_token(auth_key: str) -> str:
     return r.json()["access_token"]
 
 def find_dish_photo(keyword: str) -> str:
-    base_api = "https://" + "://themealdb.com" + "/api/json/v1/1/search.php?s="
-    for word in keyword.replace(",", " ").split():
-        if len(word) > 2:
-            try:
-                resp = requests.get(base_api + urllib.parse.quote(word), timeout=5).json()
-                if resp.get("meals"):
-                    return random.choice(resp["meals"])["strMealThumb"]
-            except Exception:
-                pass
-    try:
-        rand_url = "https://" + "://themealdb.com" + "/api/json/v1/1/random.php"
-        resp = requests.get(rand_url, timeout=5).json()
-        if resp.get("meals"):
-            return resp["meals"].pop(0)["strMealThumb"]
-    except Exception:
-        pass
-    return ""
+    w = "https://" + "upload.wikimedia.org/wikipedia/commons/thumb/"
+    photos = {
+        "chicken": w + "6/6d/Good_Food_Display_-_NCI_Visuals_Online.jpg/800px-Good_Food_Display_-_NCI_Visuals_Online.jpg",
+        "beef": w + "6/60/Roast_beef_with_vegetables.jpg/800px-Roast_beef_with_vegetables.jpg",
+        "steak": w + "2/2b/Beef_fillet_steak_with_mushrooms.jpg/800px-Beef_fillet_steak_with_mushrooms.jpg",
+        "pasta": w + "3/3f/%28Pasta%29_by_David_Adam_Kess_%28pic.2%29.jpg/800px-%28Pasta%29_by_David_Adam_Kess_%28pic.2%29.jpg",
+        "salad": w + "9/94/Salad_platter.jpg/800px-Salad_platter.jpg",
+        "lasagna": w + "b/ba/Lasagne_-_stonesoup.jpg/800px-Lasagne_-_stonesoup.jpg",
+        "fish": w + "e/e6/Penne_arrabbiata.jpg/800px-Penne_arrabbiata.jpg"
+    }
+    kw = keyword.lower()
+    for key, url in photos.items():
+        if key in kw:
+            return url
+    return photos["chicken"]
 def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
-        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
-        "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 1 главное слово на английском (например: lasagna, chicken, beef, pasta, soup, salad)\n"
+        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
+        "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 1 слово на английском из списка (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
         "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
     )
