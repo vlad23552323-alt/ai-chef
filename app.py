@@ -73,20 +73,23 @@ def get_gigachat_token(auth_key: str) -> str:
         raise ValueError(f"Ошибка авторизации Сбера (код {r.status_code}). Проверьте ключ и пакет токенов.")
     return r.json()["access_token"]
 
-def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str) -> dict:
+def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
     sys_prompt = (
-        "Ты профессиональный повар. Придумай вкусное блюдо из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
+        "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
+        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
         "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 2-3 слова на английском для фото блюда\n"
         "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
     )
-    usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}."
+    avoid_text = f" Не повторяй эти блюда: {', '.join(past_titles)}." if past_titles else ""
+    usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}.{avoid_text}"
+    
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
     payload = {
         "model": "GigaChat",
         "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": usr_prompt}],
-        "temperature": 0.7
+        "temperature": 0.9
     }
     r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=35)
     if not r.text.strip():
@@ -177,7 +180,8 @@ with col2:
             else:
                 with st.spinner("Шеф-повар готовит рецепт..."):
                     try:
-                        res = fetch_recipe(api_key, selected, meal, time_lim, wishes)
+                        past = [item["title"] for item in st.session_state.history]
+                        res = fetch_recipe(api_key, selected, meal, time_lim, wishes, past)
                         st.session_state.history.append(res)
                         st.session_state.current = res
                     except Exception as e:
@@ -213,6 +217,3 @@ with col2:
         else:
             st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
             st.write("1. Отметьте продукты в меню слева или впишите свои через запятую.")
-            st.write("2. Укажите пожелания (например: *ПП*, *без духовки*, *на скорую руку*).")
-            st.write("3. Нажмите **«Придумать рецепт»** — нейросеть рассчитает КБЖУ, распишет шаги и подберет фото.")
-            st.info("💡 Все сгенерированные блюда сохраняются в левой панели — к ним можно вернуться в любой момент.")
