@@ -77,7 +77,6 @@ def get_gigachat_token(auth_key: str) -> str:
     return r.json()["access_token"]
 
 def find_dish_photo(keyword: str) -> str:
-    """Ищет реальное фото блюда по ключевому слову в открытой кулинарной базе."""
     base_api = "https://" + "://themealdb.com" + "/api/json/v1/1/search.php?s="
     for word in keyword.replace(",", " ").split():
         if len(word) > 2:
@@ -87,7 +86,6 @@ def find_dish_photo(keyword: str) -> str:
                     return random.choice(resp["meals"])["strMealThumb"]
             except Exception:
                 pass
-    # Запасной вариант — случайное аппетитное блюдо из той же базы
     try:
         rand_url = "https://" + "://themealdb.com" + "/api/json/v1/1/random.php"
         resp = requests.get(rand_url, timeout=5).json()
@@ -96,7 +94,6 @@ def find_dish_photo(keyword: str) -> str:
     except Exception:
         pass
     return ""
-
 def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
     sys_prompt = (
@@ -222,3 +219,25 @@ with col2:
             m1.metric("⏱️ Время", rec["time"])
             m2.metric("📊 Сложность", rec["diff"])
             m3.metric("🔥 Калории", rec["cal"])
+            st.caption(f"**БЖУ:** {rec['macros']}")
+            st.divider()
+
+            st.markdown("### 🛒 Ингредиенты:")
+            for ing in rec["ings"]:
+                st.markdown(f"- {ing}")
+
+            st.markdown("### 👨‍🍳 Приготовление:")
+            for i, step in enumerate(rec["steps"], 1):
+                st.markdown(f"**{i}.** {step}")
+
+            if rec["tip"]:
+                st.success(f"💡 **Совет шефа:** {rec['tip']}")
+
+            txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
+            st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
+        else:
+            st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
+            st.write("1. Отметьте продукты в меню слева или впишите свои через запятую.")
+            st.write("2. Укажите пожелания (например: *ПП*, *без духовки*, *на скорую руку*).")
+            st.write("3. Нажмите **«Придумать рецепт»** — нейросеть рассчитает КБЖУ, распишет шаги и подберет фото.")
+            st.info("💡 Все сгенерированные блюда сохраняются в левой панели — к ним можно вернуться в любой момент.")
