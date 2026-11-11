@@ -76,7 +76,7 @@ def get_gigachat_token(auth_key: str) -> str:
     return r.json()["access_token"]
 
 def find_dish_photo(keyword: str) -> str:
-    p = "https://" + "://pexels.com"
+        p = "https://" + "images." + "://pexels.com"
     q = "?auto=compress&cs=tinysrgb&w=800"
     photos = {
         "chicken": p + "2338407/pexels-photo-2338407.jpeg" + q,
