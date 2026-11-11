@@ -8,6 +8,48 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
 
+# =====================================================================
+# 🎨 КАСТОМНЫЙ ДИЗАЙН (ГРАДИЕНТ, КАРТОЧКИ, СТИЛЬ КНОПОК)
+# =====================================================================
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0b0f19 0%, #17153b 50%, #090d16 100%);
+    color: #f8fafc;
+}
+[data-testid="stSidebar"] {
+    background-color: rgba(11, 15, 25, 0.85);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+div.stButton > button[kind="primary"] {
+    background: linear-gradient(90deg, #ff6b35 0%, #f72585 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.65rem 1.2rem;
+    font-weight: 700;
+    font-size: 16px;
+    box-shadow: 0 4px 15px rgba(247, 37, 133, 0.35);
+    transition: all 0.2s ease;
+}
+div.stButton > button[kind="primary"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(247, 37, 133, 0.55);
+}
+[data-testid="stImage"] img {
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+[data-testid="stMetric"] {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px;
+    border-radius: 14px;
+    backdrop-filter: blur(8px);
+}
+</style>
+""", unsafe_allow_html=True)
+
 AUTH_URL = "https://" + "ngw.devices.sberbank.ru:9443" + "/api/v2/oauth"
 API_URL = "https://" + "gigachat.devices.sberbank.ru" + "/api/v1/chat/completions"
 
@@ -89,89 +131,100 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
         data["steps"] = [text]
     return data
 
+# =====================================================================
+# 🧭 БОКОВАЯ ПАНЕЛЬ (С ПОДДЕРЖКОЙ SECRETS И КЛИКАБЕЛЬНОЙ ИСТОРИЕЙ)
+# =====================================================================
 with st.sidebar:
     st.header("🔑 Настройки")
-    api_key = st.text_input("GigaChat Authorization Key:", type="password")
+    saved_key = st.secrets.get("GIGACHAT_KEY", "") if hasattr(st, "secrets") else ""
+    api_key = st.text_input("GigaChat Authorization Key:", value=saved_key, type="password")
+    
     st.divider()
-    st.header("📜 История")
-    for idx, item in enumerate(reversed(st.session_state.history)):
-        st.markdown(f"**{len(st.session_state.history) - idx}. {item['title']}**")
+    st.header("📜 История блюд")
+    if not st.session_state.history:
+        st.caption("Здесь появятся ваши сгенерированные рецепты.")
+    else:
+        for idx, item in enumerate(reversed(st.session_state.history)):
+            if st.button(f"🍽️ {item['title']}", key=f"hist_{idx}", use_container_width=True):
+                st.session_state.current = item
 
 st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов")
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
-    st.subheader("1. Продукты в наличии")
-    catalog = {
-        "🥩 Мясо и рыба": ["Куриное филе", "Говядина", "Свинина", "Фарш", "Рыба", "Яйца", "Сосиски", "Тунец"],
-        "🥦 Овощи": ["Картофель", "Лук", "Морковь", "Помидоры", "Огурцы", "Чеснок", "Шампиньоны", "Капуста"],
-        "🧀 Молочка": ["Молоко", "Сыр твердый", "Сметана", "Сливочное масло", "Творог", "Сливки"],
-        "🌾 Крупы и мучное": ["Рис", "Макароны", "Гречка", "Овсянка", "Мука", "Хлеб", "Лаваш"]
-    }
-    selected = []
-    for tab, (cat, items) in zip(st.tabs(list(catalog.keys())), catalog.items()):
-        with tab:
-            cols = st.columns(2)
-            for i, prod in enumerate(items):
-                if cols[i % 2].checkbox(prod, key=f"p_{prod}"):
-                    selected.append(prod)
+    with st.container(border=True):
+        st.subheader("1. Продукты в наличии")
+        catalog = {
+            "🥩 Мясо и рыба": ["Куриное филе", "Говядина", "Свинина", "Фарш", "Рыба", "Яйца", "Сосиски", "Тунец"],
+            "🥦 Овощи": ["Картофель", "Лук", "Морковь", "Помидоры", "Огурцы", "Чеснок", "Шампиньоны", "Капуста"],
+            "🧀 Молочка": ["Молоко", "Сыр твердый", "Сметана", "Сливочное масло", "Творог", "Сливки"],
+            "🌾 Крупы и мучное": ["Рис", "Макароны", "Гречка", "Овсянка", "Мука", "Хлеб", "Лаваш"]
+        }
+        selected = []
+        for tab, (cat, items) in zip(st.tabs(list(catalog.keys())), catalog.items()):
+            with tab:
+                cols = st.columns(2)
+                for i, prod in enumerate(items):
+                    if cols[i % 2].checkbox(prod, key=f"p_{prod}"):
+                        selected.append(prod)
 
-    custom = st.text_input("➕ Свои продукты (через запятую):")
-    if custom:
-        selected.extend([x.strip() for x in custom.split(",") if x.strip()])
-    if selected:
-        st.info(f"**Выбрано:** {', '.join(selected)}")
+        custom = st.text_input("➕ Свои продукты (через запятую):")
+        if custom:
+            selected.extend([x.strip() for x in custom.split(",") if x.strip()])
+        if selected:
+            st.info(f"**Выбрано ({len(selected)}):** {', '.join(selected)}")
 
-    st.subheader("2. Параметры")
-    c1, c2 = st.columns(2)
-    meal = c1.selectbox("Прием пищи:", ["Любой", "Завтрак", "Обед", "Ужин", "Перекус"])
-    time_lim = c2.selectbox("Время:", ["Не важно", "До 15 мин", "До 30 мин", "До 1 часа"])
-    wishes = st.text_input("✨ Пожелания (ПП, без жарки и т.д.):")
-    btn = st.button("🔥 Придумать рецепт", type="primary", use_container_width=True)
+        st.subheader("2. Параметры")
+        c1, c2 = st.columns(2)
+        meal = c1.selectbox("Прием пищи:", ["Любой", "Завтрак", "Обед", "Ужин", "Перекус"])
+        time_lim = c2.selectbox("Время:", ["Не важно", "До 15 мин", "До 30 мин", "До 1 часа"])
+        wishes = st.text_input("✨ Пожелания (ПП, без жарки и т.д.):")
+        btn = st.button("🔥 Придумать рецепт", type="primary", use_container_width=True)
 
 with col2:
-    st.subheader("🍽️ Готовый рецепт")
-    if btn:
-        if not api_key:
-            st.error("⚠️ Введите Authorization Key в меню слева!")
-        elif not selected:
-            st.error("⚠️ Выберите хотя бы один продукт!")
+    with st.container(border=True):
+        st.subheader("🍽️ Готовый рецепт")
+        if btn:
+            if not api_key:
+                st.error("⚠️ Введите Authorization Key в меню слева!")
+            elif not selected:
+                st.error("⚠️ Выберите хотя бы один продукт!")
+            else:
+                with st.spinner("Шеф-повар готовит рецепт..."):
+                    try:
+                        res = fetch_recipe(api_key, selected, meal, time_lim, wishes)
+                        st.session_state.history.append(res)
+                        st.session_state.current = res
+                    except Exception as e:
+                        st.error(f"🚨 Ошибка: {e}")
+
+        if "current" in st.session_state:
+            rec = st.session_state.current
+            st.markdown(f"## {rec['title']}")
+
+            kw = urllib.parse.quote(f"delicious {rec['keyword']}, professional food photography, appetizing, 4k")
+            img_url = "https://" + "image.pollinations.ai/prompt/" + kw + "?width=800&height=450&nologo=true"
+            st.image(img_url, use_container_width=True)
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("⏱️ Время", rec["time"])
+            m2.metric("📊 Сложность", rec["diff"])
+            m3.metric("🔥 Калории", rec["cal"])
+            st.caption(f"**БЖУ:** {rec['macros']}")
+            st.divider()
+
+            st.markdown("### 🛒 Ингредиенты:")
+            for ing in rec["ings"]:
+                st.markdown(f"- {ing}")
+
+            st.markdown("### 👨‍🍳 Приготовление:")
+            for i, step in enumerate(rec["steps"], 1):
+                st.markdown(f"**{i}.** {step}")
+
+            if rec["tip"]:
+                st.success(f"💡 **Совет шефа:** {rec['tip']}")
+
+            txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
+            st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
         else:
-            with st.spinner("Шеф-повар готовит рецепт..."):
-                try:
-                    res = fetch_recipe(api_key, selected, meal, time_lim, wishes)
-                    st.session_state.history.append(res)
-                    st.session_state.current = res
-                except Exception as e:
-                    st.error(f"🚨 Ошибка: {e}")
-
-    if "current" in st.session_state:
-        rec = st.session_state.current
-        st.markdown(f"## {rec['title']}")
-
-        kw = urllib.parse.quote(f"delicious {rec['keyword']}, professional food photography, appetizing, 4k")
-        img_url = "https://" + "image.pollinations.ai/prompt/" + kw + "?width=800&height=450&nologo=true"
-        st.image(img_url, use_container_width=True)
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("⏱️ Время", rec["time"])
-        m2.metric("📊 Сложность", rec["diff"])
-        m3.metric("🔥 Калории", rec["cal"])
-        st.caption(f"**БЖУ:** {rec['macros']}")
-        st.divider()
-
-        st.markdown("### 🛒 Ингредиенты:")
-        for ing in rec["ings"]:
-            st.markdown(f"- {ing}")
-
-        st.markdown("### 👨‍🍳 Приготовление:")
-        for i, step in enumerate(rec["steps"], 1):
-            st.markdown(f"**{i}.** {step}")
-
-        if rec["tip"]:
-            st.success(f"💡 **Совет шефа:** {rec['tip']}")
-
-        txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
-        st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
-    else:
-        st.info("👈 Выберите продукты, вставьте ключ слева и нажмите кнопку.")
+            st.info("👈 Выберите продукты, вставьте ключ слева и нажмите кнопку.")
