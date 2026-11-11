@@ -76,16 +76,15 @@ def get_gigachat_token(auth_key: str) -> str:
     return r.json()["access_token"]
 
 def find_dish_photo(keyword: str) -> str:
-    p = "https://" + "images." + "://pexels.com"
-    q = "?auto=compress&cs=tinysrgb&w=800"
+    m = "https://" + "www.themealdb." + "com/images/media/meals/"
     photos = {
-        "chicken": p + "2338407/pexels-photo-2338407.jpeg" + q,
-        "beef": p + "769289/pexels-photo-769289.jpeg" + q,
-        "steak": p + "3535383/pexels-photo-3535383.jpeg" + q,
-        "pasta": p + "1279330/pexels-photo-1279330.jpeg" + q,
-        "salad": p + "1059905/pexels-photo-1059905.jpeg" + q,
-        "lasagna": p + "4079520/pexels-photo-4079520.jpeg" + q,
-        "fish": p + "262959/pexels-photo-262959.jpeg" + q
+        "chicken": m + "wyxwsp1486979827.jpg",
+        "beef": m + "sytuqu1511553755.jpg",
+        "steak": m + "vussxq1511882648.jpg",
+        "pasta": m + "ustsqw1468250014.jpg",
+        "salad": m + "wvpsxx1468256321.jpg",
+        "lasagna": m + "wtsvxx1511296896.jpg",
+        "fish": m + "1548772327.jpg"
     }
     kw = keyword.lower()
     for key, url in photos.items():
@@ -97,7 +96,7 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
         "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
-        "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 1 слово на английском из списка (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
+        "Оформи ответ строго обычным текстом без символов # и * по меткам:\nTITLE: Название блюда\nKEYWORD: 1 слово на английском (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
         "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
     )
@@ -122,15 +121,15 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     }
     mode = None
     for line in text.splitlines():
-        s = line.strip()
+        s = line.strip().lstrip("#* ")
         if not s: continue
         if s.startswith("TITLE:"): data["title"] = s[6:].strip().strip('"«»*')
-        elif s.startswith("KEYWORD:"): data["keyword"] = s[8:].strip()
-        elif s.startswith("TIME:"): data["time"] = s[5:].strip()
-        elif s.startswith("DIFF:"): data["diff"] = s[5:].strip()
-        elif s.startswith("CAL:"): data["cal"] = s[4:].strip()
-        elif s.startswith("MACROS:"): data["macros"] = s[7:].strip()
-        elif s.startswith("TIP:"): data["tip"] = s[4:].strip()
+        elif s.startswith("KEYWORD:"): data["keyword"] = s[8:].strip().strip('*')
+        elif s.startswith("TIME:"): data["time"] = s[5:].strip().strip('*')
+        elif s.startswith("DIFF:"): data["diff"] = s[5:].strip().strip('*')
+        elif s.startswith("CAL:"): data["cal"] = s[4:].strip().strip('*')
+        elif s.startswith("MACROS:"): data["macros"] = s[7:].strip().strip('*')
+        elif s.startswith("TIP:"): data["tip"] = s[4:].strip().strip('*')
         elif s.startswith("INGREDIENTS:"): mode = "ing"
         elif s.startswith("STEPS:"): mode = "step"
         elif mode == "ing": data["ings"].append(s.lstrip("-•* ").strip())
