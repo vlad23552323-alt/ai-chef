@@ -5,18 +5,13 @@ import urllib.parse
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
 
-# =====================================================================
-# 🎨 КАСТОМНЫЙ ДИЗАЙН (ОБЪЕМНЫЙ ФОН, СТЕКЛЯННЫЕ КАРТОЧКИ, КНОПКИ)
-# =====================================================================
 st.markdown("""
 <style>
 .stApp {
     background: radial-gradient(circle at 15% 20%, #2a1b3d 0%, transparent 45%),
-                radial-gradient(circle at 85% 80%, #162447 0%, transparent 45%),
-                #0d111a;
+                radial-gradient(circle at 85% 80%, #162447 0%, transparent 45%), #0d111a;
     color: #f8fafc;
 }
 [data-testid="stSidebar"] {
@@ -82,29 +77,15 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     token = get_gigachat_token(auth_key)
     sys_prompt = (
         "Ты профессиональный повар. Придумай вкусное блюдо из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
-        "Оформи ответ строго по меткам:\n"
-        "TITLE: Название блюда\n"
-        "KEYWORD: 2-3 слова на английском для фото блюда\n"
-        "TIME: Время готовки\n"
-        "DIFF: Сложность (Легко/Средне/Сложно)\n"
-        "CAL: Калории на 100г\n"
-        "MACROS: Б: ... | Ж: ... | У: ...\n"
-        "INGREDIENTS:\n- Ингредиент с граммовкой\n"
-        "STEPS:\n1. Шаг приготовления\n"
-        "TIP: Короткий совет шефа"
+        "Оформи ответ строго по меткам:\nTITLE: Название блюда\nKEYWORD: 2-3 слова на английском для фото блюда\n"
+        "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
+        "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа"
     )
     usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}."
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
     payload = {
         "model": "GigaChat",
-        "messages": [
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": usr_prompt}
-        ],
+        "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": usr_prompt}],
         "temperature": 0.7
     }
     r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=35)
@@ -112,19 +93,15 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
         raise ValueError(f"GigaChat вернул пустой ответ (HTTP {r.status_code}). Попробуйте нажать кнопку еще раз.")
     r.raise_for_status()
 
-    first_choice = r.json()["choices"].pop(0)
-    text = first_choice["message"]["content"]
-
+    text = r.json()["choices"].pop(0)["message"]["content"]
     data = {
         "title": "Блюдо от шефа", "keyword": "delicious food", "time": time_lim,
-        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано",
-        "ings": [], "steps": [], "tip": ""
+        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано", "ings": [], "steps": [], "tip": ""
     }
     mode = None
     for line in text.splitlines():
         s = line.strip()
-        if not s:
-            continue
+        if not s: continue
         if s.startswith("TITLE:"): data["title"] = s[6:].strip().strip('"«»*')
         elif s.startswith("KEYWORD:"): data["keyword"] = s[8:].strip()
         elif s.startswith("TIME:"): data["time"] = s[5:].strip()
@@ -141,14 +118,10 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
         data["steps"] = [text]
     return data
 
-# =====================================================================
-# 🧭 БОКОВАЯ ПАНЕЛЬ (SECRETS И КЛИКАБЕЛЬНАЯ ИСТОРИЯ)
-# =====================================================================
 with st.sidebar:
     st.header("🔑 Настройки")
     saved_key = st.secrets.get("GIGACHAT_KEY", "") if hasattr(st, "secrets") else ""
     api_key = st.text_input("GigaChat Authorization Key:", value=saved_key, type="password")
-
     st.divider()
     st.header("📜 История блюд")
     if not st.session_state.history:
@@ -160,7 +133,6 @@ with st.sidebar:
 
 st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов")
 st.caption("Умный подбор блюд из ваших продуктов с расчетом КБЖУ и визуализацией")
-
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
@@ -214,7 +186,6 @@ with col2:
         if "current" in st.session_state:
             rec = st.session_state.current
             st.markdown(f"## {rec['title']}")
-
             kw = urllib.parse.quote(f"delicious {rec['keyword']}, professional food photography, appetizing, 4k")
             img_url = "https://" + "image.pollinations.ai/prompt/" + kw + "?width=800&height=450&nologo=true"
             st.image(img_url, use_container_width=True)
@@ -240,4 +211,8 @@ with col2:
             txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
             st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
         else:
-            st.markdown("""
+            st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
+            st.write("1. Отметьте продукты в меню слева или впишите свои через запятую.")
+            st.write("2. Укажите пожелания (например: *ПП*, *без духовки*, *на скорую руку*).")
+            st.write("3. Нажмите **«Придумать рецепт»** — нейросеть рассчитает КБЖУ, распишет шаги и подберет фото.")
+            st.info("💡 Все сгенерированные блюда сохраняются в левой панели — к ним можно вернуться в любой момент.")
