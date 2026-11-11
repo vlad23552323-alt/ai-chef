@@ -9,7 +9,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
 
 # =====================================================================
-# 🎨 КАСТОМНЫЙ ДИЗАЙН (ГРАДИЕНТ, КАРТОЧКИ, СТИЛЬ КНОПОК)
+# 🎨 КАСТОМНЫЙ ДИЗАЙН (ОБЪЕМНЫЙ ФОН, СТЕКЛЯННЫЕ КАРТОЧКИ, КНОПКИ)
 # =====================================================================
 st.markdown("""
 <style>
@@ -142,13 +142,13 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     return data
 
 # =====================================================================
-# 🧭 БОКОВАЯ ПАНЕЛЬ (С ПОДДЕРЖКОЙ SECRETS И КЛИКАБЕЛЬНОЙ ИСТОРИЕЙ)
+# 🧭 БОКОВАЯ ПАНЕЛЬ (SECRETS И КЛИКАБЕЛЬНАЯ ИСТОРИЯ)
 # =====================================================================
 with st.sidebar:
     st.header("🔑 Настройки")
     saved_key = st.secrets.get("GIGACHAT_KEY", "") if hasattr(st, "secrets") else ""
     api_key = st.text_input("GigaChat Authorization Key:", value=saved_key, type="password")
-    
+
     st.divider()
     st.header("📜 История блюд")
     if not st.session_state.history:
@@ -159,6 +159,8 @@ with st.sidebar:
                 st.session_state.current = item
 
 st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов")
+st.caption("Умный подбор блюд из ваших продуктов с расчетом КБЖУ и визуализацией")
+
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
@@ -184,6 +186,7 @@ with col1:
         if selected:
             st.info(f"**Выбрано ({len(selected)}):** {', '.join(selected)}")
 
+        st.divider()
         st.subheader("2. Параметры")
         c1, c2 = st.columns(2)
         meal = c1.selectbox("Прием пищи:", ["Любой", "Завтрак", "Обед", "Ужин", "Перекус"])
@@ -237,11 +240,4 @@ with col2:
             txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
             st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
         else:
-                     st.markdown("""
-            ### 👋 Добро пожаловать на кухню ИИ-Шефа!
-            Чтобы получить персональный рецепт, сделайте три простых шага:
-            1. **Отметьте продукты** в меню слева или впишите свои через запятую.
-            2. **Укажите пожелания** (например: *ПП*, *без духовки*, *на скорую руку*).
-            3. **Нажмите «Придумать рецепт»** — нейросеть рассчитает калории, распишет шаги и подберет фото готового блюда.
-            """)
-            st.info("💡 Все сгенерированные блюда сохраняются в левой боковой панели — к ним можно вернуться в любой момент.")  
+            st.markdown("""
