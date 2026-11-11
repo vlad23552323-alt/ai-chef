@@ -76,7 +76,7 @@ def get_gigachat_token(auth_key: str) -> str:
     return r.json()["access_token"]
 
 def find_dish_photo(keyword: str) -> str:
-        p = "https://" + "images." + "://pexels.com"
+    p = "https://" + "images." + "://pexels.com"
     q = "?auto=compress&cs=tinysrgb&w=800"
     photos = {
         "chicken": p + "2338407/pexels-photo-2338407.jpeg" + q,
@@ -92,7 +92,7 @@ def find_dish_photo(keyword: str) -> str:
         if key in kw:
             return url
     return photos["beef"]
-    def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
+def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, past_titles: list) -> dict:
     token = get_gigachat_token(auth_key)
     sys_prompt = (
         "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
