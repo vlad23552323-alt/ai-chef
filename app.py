@@ -77,10 +77,14 @@ def get_gigachat_token(auth_key: str) -> str:
         "RqUID": str(uuid.uuid4()),
         "Authorization": f"Basic {auth_key.strip()}"
     }
-    r = requests.post(AUTH_URL, headers=headers, data={"scope": "GIGACHAT_API_PERS"}, verify=False, timeout=20)
-    if r.status_code != 200 or not r.text.strip():
-        raise ValueError(f"Ошибка авторизации Сбера (код {r.status_code}). Проверьте ключ и пакет токенов.")
-    return r.json()["access_token"]
+    for attempt in range(3):
+        try:
+            r = requests.post(AUTH_URL, headers=headers, data={"scope": "GIGACHAT_API_PERS"}, verify=False, timeout=20)
+            if r.status_code == 200 and r.text.strip():
+                return r.json()["access_token"]
+        except requests.exceptions.RequestException:
+            time.sleep(1)
+    raise ValueError("Ошибка авторизации Сбера. Проверьте ключ и интернет-соединение.")
 def fallback_dish_photo(keyword: str) -> str:
     m = "https://" + "www.themealdb." + "com/images/media/meals/"
     photos = {
@@ -132,15 +136,21 @@ def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str) -> str:
         "temperature": 0.85
     }
     for attempt in range(4):
-        r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=40)
-        if r.status_code == 429:
-            time.sleep(1.5 + attempt)
-            continue
-        if not r.text.strip():
-            raise ValueError(f"GigaChat вернул пустой ответ (HTTP {r.status_code}). Попробуйте нажать кнопку еще раз.")
-        r.raise_for_status()
-        return r.json()["choices"].pop(0)["message"]["content"]
-    raise ValueError("Сервер GigaChat сейчас перегружен одновременными запросами. Попробуйте через пару секунд.")
+        try:
+            r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=40)
+            if r.status_code == 429:
+                time.sleep(1.5 + attempt)
+                continue
+            if not r.text.strip():
+                time.sleep(1)
+                continue
+            r.raise_for_status()
+            return r.json()["choices"].pop(0)["message"]["content"]
+        except requests.exceptions.RequestException:
+            if attempt == 3:
+                raise ValueError("Не удалось соединиться с сервером GigaChat из-за сетевого сбоя. Нажмите кнопку еще раз.")
+            time.sleep(1.5)
+    raise ValueError("Сервер GigaChat сейчас перегружен. Попробуйте через пару секунд.")
 def calc_total_rub(lines: list, fallback_str: str) -> str:
     prices = [int(p) for line in lines for p in re.findall(r'(\d+)\s*(?:₽|руб)', line)]
     return f"~{sum(prices)} ₽" if prices else fallback_str
