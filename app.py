@@ -350,11 +350,11 @@ with col2:
                 st.caption(f"**Общее БЖУ за день:** {rec['macros']}")
                 st.divider()
 
-                tabs = st.tabs(["🌅 Завтрак", "☀️ Обед", "🌙 Ужин"])
+                t1, t2, t3 = st.tabs(["🌅 Завтрак", "☀️ Обед", "🌙 Ужин"])
                 meals_data = [
-                    (tabs, rec["b_title"], rec.get("b_photo"), rec.get("b_ings", []), rec.get("b_steps", [])),
-                    (tabs, rec["l_title"], rec.get("l_photo"), rec.get("l_ings", []), rec.get("l_steps", [])),
-                    (tabs, rec["d_title"], rec.get("d_photo"), rec.get("d_ings", []), rec.get("d_steps", []))
+                    (t1, rec["b_title"], rec.get("b_photo"), rec.get("b_ings", []), rec.get("b_steps", [])),
+                    (t2, rec["l_title"], rec.get("l_photo"), rec.get("l_ings", []), rec.get("l_steps", [])),
+                    (t3, rec["d_title"], rec.get("d_photo"), rec.get("d_ings", []), rec.get("d_steps", []))
                 ]
                 for tab, m_title, m_photo, m_ings, m_steps in meals_data:
                     with tab:
