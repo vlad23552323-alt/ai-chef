@@ -116,10 +116,10 @@ def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str) -> str:
 def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
     sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай акцент на высоком белке и минимуме жиров. " if sport_mode else ""
     sys_prompt = (
-        "Ты креативный шеф-повар. Придумай вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
+        "Ты креативный российский шеф-повар. Пиши СТРОГО на русском языке. Придумай вкусное блюдо из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
         f"{sport_rule}Придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, салаты, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки. "
         "Оцени среднюю стоимость граммовки продуктов в рублях (РФ). Оформи ответ строго по меткам без # и *:\n"
-        "TITLE: Название\nKEYWORD: 1 слово (chicken, beef, steak, pasta, salad, lasagna, fish, soup, pancake, egg, rice, potato, sandwich, dessert)\n"
+        "TITLE: Название блюда на русском\nKEYWORD: 1 слово (chicken, beef, steak, pasta, salad, lasagna, fish, soup, pancake, egg, rice, potato, sandwich, dessert)\n"
         "TIME: Время\nDIFF: Сложность\nCAL: Калории на 100г\nCOST: Цена блюда (коротко, например: ~290 ₽)\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой (~цена ₽)\nSTEPS:\n1. Шаг приготовления\nTIP: Совет шефа\nPAIRING: Соус, гарнир или напиток"
     )
@@ -157,21 +157,30 @@ def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: s
 def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: bool) -> dict:
     sport_rule = "Упор на высокий белок. " if sport_mode else ""
     sys_prompt = (
-        "Ты диетолог. Составь рацион на день (Завтрак, Обед, Ужин) из переданных продуктов (можно добавить базовые специи, воду, масло, крупы). "
-        f"{sport_rule}Посчитай примерную цену каждого приема пищи и итог за день в рублях. Оформи строго по меткам без # и *:\n"
+        "Ты российский диетолог. Пиши все названия блюд, ингредиенты и шаги СТРОГО НА РУССКОМ ЯЗЫКЕ! "
+        "Составь рацион на день (Завтрак, Обед, Ужин) из переданных продуктов (можно добавить базовые специи, воду, масло, крупы). "
+        f"{sport_rule}Посчитай примерную цену каждого приема пищи и итог за день в рублях. "
+        "Оформляй каждый ингредиент и каждый шаг приготовления С НОВОЙ СТРОКИ! Строго по меткам без # и *:\n"
         "TOTAL_COST: ~620 ₽\nTOTAL_CAL: ~1850 ккал\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
-        "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_KW: 1 слово на англ (egg, pancake, sandwich, salad)\nBREAKFAST_INFO: Состав, граммовка, цена и шаги\n"
-        "LUNCH_TITLE: Название обеда\nLUNCH_KW: 1 слово на англ (soup, chicken, beef, pasta, rice, fish)\nLUNCH_INFO: Состав, граммовка, цена и шаги\n"
-        "DINNER_TITLE: Название ужина\nDINNER_KW: 1 слово на англ (salad, fish, chicken, steak, potato, lasagna)\nDINNER_INFO: Состав, граммовка, цена и шаги\n"
-        "TIP: Совет диетолога"
+        "BREAKFAST_TITLE: Название завтрака НА РУССКОМ\nBREAKFAST_KW: egg\n"
+        "BREAKFAST_INGS:\n- Продукт 1\n- Продукт 2\n"
+        "BREAKFAST_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
+        "LUNCH_TITLE: Название обеда НА РУССКОМ\nLUNCH_KW: soup\n"
+        "LUNCH_INGS:\n- Продукт 1\n- Продукт 2\n"
+        "LUNCH_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
+        "DINNER_TITLE: Название ужина НА РУССКОМ\nDINNER_KW: chicken\n"
+        "DINNER_INGS:\n- Продукт 1\n- Продукт 2\n"
+        "DINNER_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
+        "TIP: Совет диетолога на русском"
     )
     usr_prompt = f"Продукты: {', '.join(ingredients)}. Пожелания: {wishes or 'Сбалансированно'}."
     text = call_gigachat(auth_key, sys_prompt, usr_prompt)
 
     data = {
-        "mode": "day", "title": "Рацион на день", "cost": "~600 ₽", "cal": "~1800 ккал",
-        "macros": "Сбалансировано", "b_title": "Завтрак", "b_kw": "egg", "b_info": "",
-        "l_title": "Обед", "l_kw": "soup", "l_info": "", "d_title": "Ужин", "d_kw": "chicken", "d_info": "", "tip": "", "raw": text
+        "mode": "day", "title": "Рацион на день", "cost": "~600 ₽", "cal": "~1800 ккал", "macros": "Сбалансировано",
+        "b_title": "Завтрак", "b_kw": "egg", "b_ings": [], "b_steps": [],
+        "l_title": "Обед", "l_kw": "soup", "l_ings": [], "l_steps": [],
+        "d_title": "Ужин", "d_kw": "chicken", "d_ings": [], "d_steps": [], "tip": "", "raw": text
     }
     curr = None
     for line in text.splitlines():
@@ -180,19 +189,25 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
         if "TOTAL_COST:" in s: data["cost"] = s.split("TOTAL_COST:", 1).pop().strip().strip('*')
         elif "TOTAL_CAL:" in s: data["cal"] = s.split("TOTAL_CAL:", 1).pop().strip().strip('*')
         elif "TOTAL_MACROS:" in s: data["macros"] = s.split("TOTAL_MACROS:", 1).pop().strip().strip('*')
-        elif "BREAKFAST_TITLE:" in s: data["b_title"] = s.split("BREAKFAST_TITLE:", 1).pop().strip().strip('"«»*'); curr = "b"
+        elif "BREAKFAST_TITLE:" in s: data["b_title"] = s.split("BREAKFAST_TITLE:", 1).pop().strip().strip('"«»*')
         elif "BREAKFAST_KW:" in s: data["b_kw"] = s.split("BREAKFAST_KW:", 1).pop().strip().strip('*')
-        elif "BREAKFAST_INFO:" in s: data["b_info"] = s.split("BREAKFAST_INFO:", 1).pop().strip(); curr = "b"
-        elif "LUNCH_TITLE:" in s: data["l_title"] = s.split("LUNCH_TITLE:", 1).pop().strip().strip('"«»*'); curr = "l"
+        elif "BREAKFAST_INGS:" in s: curr = "b_ing"
+        elif "BREAKFAST_STEPS:" in s: curr = "b_step"
+        elif "LUNCH_TITLE:" in s: data["l_title"] = s.split("LUNCH_TITLE:", 1).pop().strip().strip('"«»*')
         elif "LUNCH_KW:" in s: data["l_kw"] = s.split("LUNCH_KW:", 1).pop().strip().strip('*')
-        elif "LUNCH_INFO:" in s: data["l_info"] = s.split("LUNCH_INFO:", 1).pop().strip(); curr = "l"
-        elif "DINNER_TITLE:" in s: data["d_title"] = s.split("DINNER_TITLE:", 1).pop().strip().strip('"«»*'); curr = "d"
+        elif "LUNCH_INGS:" in s: curr = "l_ing"
+        elif "LUNCH_STEPS:" in s: curr = "l_step"
+        elif "DINNER_TITLE:" in s: data["d_title"] = s.split("DINNER_TITLE:", 1).pop().strip().strip('"«»*')
         elif "DINNER_KW:" in s: data["d_kw"] = s.split("DINNER_KW:", 1).pop().strip().strip('*')
-        elif "DINNER_INFO:" in s: data["d_info"] = s.split("DINNER_INFO:", 1).pop().strip(); curr = "d"
+        elif "DINNER_INGS:" in s: curr = "d_ing"
+        elif "DINNER_STEPS:" in s: curr = "d_step"
         elif "TIP:" in s: data["tip"] = s.split("TIP:", 1).pop().strip().strip('*'); curr = None
-        elif curr == "b": data["b_info"] += "\n" + s
-        elif curr == "l": data["l_info"] += "\n" + s
-        elif curr == "d": data["d_info"] += "\n" + s
+        elif curr == "b_ing": data["b_ings"].append(s.lstrip("-•* ").strip())
+        elif curr == "b_step": data["b_steps"].append(s.lstrip("0123456789.) ").strip())
+        elif curr == "l_ing": data["l_ings"].append(s.lstrip("-•* ").strip())
+        elif curr == "l_step": data["l_steps"].append(s.lstrip("0123456789.) ").strip())
+        elif curr == "d_ing": data["d_ings"].append(s.lstrip("-•* ").strip())
+        elif curr == "d_step": data["d_steps"].append(s.lstrip("0123456789.) ").strip())
 
     data["b_photo"] = find_dish_photo(data["b_kw"])
     data["l_photo"] = find_dish_photo(data["l_kw"])
@@ -294,23 +309,28 @@ with col2:
                 st.caption(f"**Общее БЖУ за день:** {rec['macros']}")
                 st.divider()
 
-                t1, t2, t3 = st.tabs(["🌅 Завтрак", "☀️ Обед", "🌙 Ужин"])
-                with t1:
-                    st.markdown(f"### {rec['b_title']}")
-                    if rec.get("b_photo"): st.image(rec["b_photo"], use_container_width=True)
-                    st.write(rec["b_info"] or rec["raw"])
-                with t2:
-                    st.markdown(f"### {rec['l_title']}")
-                    if rec.get("l_photo"): st.image(rec["l_photo"], use_container_width=True)
-                    st.write(rec["l_info"] or "Смотрите общий план во вкладке Завтрак.")
-                with t3:
-                    st.markdown(f"### {rec['d_title']}")
-                    if rec.get("d_photo"): st.image(rec["d_photo"], use_container_width=True)
-                    st.write(rec["d_info"] or "Смотрите общий план во вкладке Завтрак.")
+                tabs = st.tabs(["🌅 Завтрак", "☀️ Обед", "🌙 Ужин"])
+                meals_data = [
+                    (tabs[0], rec["b_title"], rec.get("b_photo"), rec.get("b_ings", []), rec.get("b_steps", [])),
+                    (tabs[1], rec["l_title"], rec.get("l_photo"), rec.get("l_ings", []), rec.get("l_steps", [])),
+                    (tabs[2], rec["d_title"], rec.get("d_photo"), rec.get("d_ings", []), rec.get("d_steps", []))
+                ]
+                for tab, m_title, m_photo, m_ings, m_steps in meals_data:
+                    with tab:
+                        st.markdown(f"### {m_title}")
+                        if m_photo: st.image(m_photo, use_container_width=True)
+                        if m_ings:
+                            st.markdown("**🛒 Ингредиенты:**")
+                            for ing in m_ings: st.markdown(f"- {ing}")
+                        if m_steps:
+                            st.markdown("**👨‍🍳 Приготовление:**")
+                            for idx, step in enumerate(m_steps, 1): st.markdown(f"**{idx}.** {step}")
+                        if not m_ings and not m_steps:
+                            st.write(rec["raw"])
 
                 if rec.get("tip"):
                     st.success(f"💡 **Совет диетолога:** {rec['tip']}")
-                txt = f"Рацион на день ({rec['cost']}, {rec['cal']})\n\nЗАВТРАК: {rec['b_title']}\n{rec['b_info']}\n\nОБЕД: {rec['l_title']}\n{rec['l_info']}\n\nУЖИН: {rec['d_title']}\n{rec['d_info']}"
+                txt = f"Рацион на день ({rec['cost']}, {rec['cal']})\n\nЗАВТРАК: {rec['b_title']}\n" + "\n".join(rec.get("b_steps", []))
                 st.download_button("📥 Скачать рацион (.txt)", txt, file_name="day_ration.txt", use_container_width=True)
             else:
                 st.markdown(f"## {rec['title']}")
