@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import uuid
 import urllib3
+import time
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
@@ -107,11 +108,16 @@ def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str) -> str:
         "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": usr_prompt}],
         "temperature": 0.9
     }
-    r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=40)
-    if not r.text.strip():
-        raise ValueError(f"GigaChat вернул пустой ответ (HTTP {r.status_code}). Попробуйте нажать кнопку еще раз.")
-    r.raise_for_status()
-    return r.json()["choices"].pop(0)["message"]["content"]
+    for attempt in range(4):
+        r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=40)
+        if r.status_code == 429:
+            time.sleep(1.5 + attempt)
+            continue
+        if not r.text.strip():
+            raise ValueError(f"GigaChat вернул пустой ответ (HTTP {r.status_code}). Попробуйте нажать кнопку еще раз.")
+        r.raise_for_status()
+        return r.json()["choices"].pop(0)["message"]["content"]
+    raise ValueError("Сервер GigaChat сейчас перегружен одновременными запросами. Попробуйте через пару секунд.")
 
 def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
     sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай акцент на высоком белке и минимуме жиров. " if sport_mode else ""
@@ -311,9 +317,9 @@ with col2:
 
                 tabs = st.tabs(["🌅 Завтрак", "☀️ Обед", "🌙 Ужин"])
                 meals_data = [
-                    (tabs[0], rec["b_title"], rec.get("b_photo"), rec.get("b_ings", []), rec.get("b_steps", [])),
-                    (tabs[1], rec["l_title"], rec.get("l_photo"), rec.get("l_ings", []), rec.get("l_steps", [])),
-                    (tabs[2], rec["d_title"], rec.get("d_photo"), rec.get("d_ings", []), rec.get("d_steps", []))
+                    (tabs, rec["b_title"], rec.get("b_photo"), rec.get("b_ings", []), rec.get("b_steps", [])),
+                    (tabs, rec["l_title"], rec.get("l_photo"), rec.get("l_ings", []), rec.get("l_steps", [])),
+                    (tabs, rec["d_title"], rec.get("d_photo"), rec.get("d_ings", []), rec.get("d_steps", []))
                 ]
                 for tab, m_title, m_photo, m_ings, m_steps in meals_data:
                     with tab:
