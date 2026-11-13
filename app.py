@@ -43,7 +43,7 @@ div.stButton > button[kind="primary"]:hover {
 [data-testid="stImage"] img {
     border-radius: 16px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    max-height: 400px;
+    max-height: 360px;
     width: 100%;
     object-fit: cover;
 }
@@ -120,7 +120,7 @@ def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: s
         f"{sport_rule}Придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, салаты, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки. "
         "Оцени среднюю стоимость граммовки продуктов в рублях (РФ). Оформи ответ строго по меткам без # и *:\n"
         "TITLE: Название\nKEYWORD: 1 слово (chicken, beef, steak, pasta, salad, lasagna, fish, soup, pancake, egg, rice, potato, sandwich, dessert)\n"
-        "TIME: Время\nDIFF: Сложность\nCAL: Калории на 100г\nCOST: Цена блюда (например: ~290 ₽)\nMACROS: Б: ... | Ж: ... | У: ...\n"
+        "TIME: Время\nDIFF: Сложность\nCAL: Калории на 100г\nCOST: Цена блюда (коротко, например: ~290 ₽)\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "INGREDIENTS:\n- Ингредиент с граммовкой (~цена ₽)\nSTEPS:\n1. Шаг приготовления\nTIP: Совет шефа\nPAIRING: Соус, гарнир или напиток"
     )
     avoid_text = f" Не повторяй: {', '.join(past_titles)}." if past_titles else ""
@@ -159,18 +159,19 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
     sys_prompt = (
         "Ты диетолог. Составь рацион на день (Завтрак, Обед, Ужин) из переданных продуктов (можно добавить базовые специи, воду, масло, крупы). "
         f"{sport_rule}Посчитай примерную цену каждого приема пищи и итог за день в рублях. Оформи строго по меткам без # и *:\n"
-        "TOTAL_COST: Бюджет за день (~620 ₽)\nTOTAL_CAL: Калории за день (~1850 ккал)\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
-        "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_INFO: Состав, граммовка, цена и шаги\n"
-        "LUNCH_TITLE: Название обеда\nLUNCH_INFO: Состав, граммовка, цена и шаги\n"
-        "DINNER_TITLE: Название ужина\nDINNER_INFO: Состав, граммовка, цена и шаги\nTIP: Совет диетолога"
+        "TOTAL_COST: ~620 ₽\nTOTAL_CAL: ~1850 ккал\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
+        "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_KW: 1 слово на англ (egg, pancake, sandwich, salad)\nBREAKFAST_INFO: Состав, граммовка, цена и шаги\n"
+        "LUNCH_TITLE: Название обеда\nLUNCH_KW: 1 слово на англ (soup, chicken, beef, pasta, rice, fish)\nLUNCH_INFO: Состав, граммовка, цена и шаги\n"
+        "DINNER_TITLE: Название ужина\nDINNER_KW: 1 слово на англ (salad, fish, chicken, steak, potato, lasagna)\nDINNER_INFO: Состав, граммовка, цена и шаги\n"
+        "TIP: Совет диетолога"
     )
     usr_prompt = f"Продукты: {', '.join(ingredients)}. Пожелания: {wishes or 'Сбалансированно'}."
     text = call_gigachat(auth_key, sys_prompt, usr_prompt)
 
     data = {
         "mode": "day", "title": "Рацион на день", "cost": "~600 ₽", "cal": "~1800 ккал",
-        "macros": "Сбалансировано", "b_title": "Завтрак", "b_info": "",
-        "l_title": "Обед", "l_info": "", "d_title": "Ужин", "d_info": "", "tip": "", "raw": text
+        "macros": "Сбалансировано", "b_title": "Завтрак", "b_kw": "egg", "b_info": "",
+        "l_title": "Обед", "l_kw": "soup", "l_info": "", "d_title": "Ужин", "d_kw": "chicken", "d_info": "", "tip": "", "raw": text
     }
     curr = None
     for line in text.splitlines():
@@ -180,16 +181,22 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
         elif "TOTAL_CAL:" in s: data["cal"] = s.split("TOTAL_CAL:", 1).pop().strip().strip('*')
         elif "TOTAL_MACROS:" in s: data["macros"] = s.split("TOTAL_MACROS:", 1).pop().strip().strip('*')
         elif "BREAKFAST_TITLE:" in s: data["b_title"] = s.split("BREAKFAST_TITLE:", 1).pop().strip().strip('"«»*'); curr = "b"
+        elif "BREAKFAST_KW:" in s: data["b_kw"] = s.split("BREAKFAST_KW:", 1).pop().strip().strip('*')
         elif "BREAKFAST_INFO:" in s: data["b_info"] = s.split("BREAKFAST_INFO:", 1).pop().strip(); curr = "b"
         elif "LUNCH_TITLE:" in s: data["l_title"] = s.split("LUNCH_TITLE:", 1).pop().strip().strip('"«»*'); curr = "l"
+        elif "LUNCH_KW:" in s: data["l_kw"] = s.split("LUNCH_KW:", 1).pop().strip().strip('*')
         elif "LUNCH_INFO:" in s: data["l_info"] = s.split("LUNCH_INFO:", 1).pop().strip(); curr = "l"
         elif "DINNER_TITLE:" in s: data["d_title"] = s.split("DINNER_TITLE:", 1).pop().strip().strip('"«»*'); curr = "d"
+        elif "DINNER_KW:" in s: data["d_kw"] = s.split("DINNER_KW:", 1).pop().strip().strip('*')
         elif "DINNER_INFO:" in s: data["d_info"] = s.split("DINNER_INFO:", 1).pop().strip(); curr = "d"
         elif "TIP:" in s: data["tip"] = s.split("TIP:", 1).pop().strip().strip('*'); curr = None
         elif curr == "b": data["b_info"] += "\n" + s
         elif curr == "l": data["l_info"] += "\n" + s
         elif curr == "d": data["d_info"] += "\n" + s
 
+    data["b_photo"] = find_dish_photo(data["b_kw"])
+    data["l_photo"] = find_dish_photo(data["l_kw"])
+    data["d_photo"] = find_dish_photo(data["d_kw"])
     data["title"] = f"Рацион ({data['cost']})"
     return data
 with st.sidebar:
@@ -290,12 +297,15 @@ with col2:
                 t1, t2, t3 = st.tabs(["🌅 Завтрак", "☀️ Обед", "🌙 Ужин"])
                 with t1:
                     st.markdown(f"### {rec['b_title']}")
+                    if rec.get("b_photo"): st.image(rec["b_photo"], use_container_width=True)
                     st.write(rec["b_info"] or rec["raw"])
                 with t2:
                     st.markdown(f"### {rec['l_title']}")
+                    if rec.get("l_photo"): st.image(rec["l_photo"], use_container_width=True)
                     st.write(rec["l_info"] or "Смотрите общий план во вкладке Завтрак.")
                 with t3:
                     st.markdown(f"### {rec['d_title']}")
+                    if rec.get("d_photo"): st.image(rec["d_photo"], use_container_width=True)
                     st.write(rec["d_info"] or "Смотрите общий план во вкладке Завтрак.")
 
                 if rec.get("tip"):
