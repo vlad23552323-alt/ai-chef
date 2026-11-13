@@ -50,7 +50,7 @@ div.stButton > button[kind="primary"]:hover {
 [data-testid="stMetric"] {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 14px;
+    padding: 12px;
     border-radius: 14px;
     backdrop-filter: blur(8px);
 }
@@ -85,56 +85,67 @@ def find_dish_photo(keyword: str) -> str:
         "pasta": m + "ustsqw1468250014.jpg",
         "salad": m + "wvpsxx1468256321.jpg",
         "lasagna": m + "wtsvxx1511296896.jpg",
-        "fish": m + "1548772327.jpg"
+        "fish": m + "1548772327.jpg",
+        "soup": m + "1529446352.jpg",
+        "pancake": m + "rwuyqx1511383174.jpg",
+        "egg": m + "1550441882.jpg",
+        "rice": m + "xxpqsy1511452222.jpg",
+        "potato": m + "vrspxv1511722107.jpg",
+        "sandwich": m + "xr0n4r1576788363.jpg",
+        "dessert": m + "wyrqqq1468233628.jpg"
     }
     kw = keyword.lower()
     for key, url in photos.items():
         if key in kw:
             return url
-    return photos["beef"]
-def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
+    return photos["chicken"]
+def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str) -> str:
     token = get_gigachat_token(auth_key)
-    sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай максимальный акцент на высоком содержании белка, минимуме жиров/масла и точном подсчете граммов белка на порцию. " if sport_mode else ""
-    sys_prompt = (
-        "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
-        f"{sport_rule}"
-        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
-        "Оформи ответ строго с новой строки для каждой метки без символов # и *:\n"
-        "TITLE: Название блюда\nKEYWORD: 1 слово на английском (chicken, beef, steak, pasta, salad, lasagna, fish)\n"
-        "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nMACROS: Б: ... | Ж: ... | У: ...\n"
-        "INGREDIENTS:\n- Ингредиент с граммовкой\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа\n"
-        "PAIRING: Идеальный соус, гарнир или напиток к этому блюду"
-    )
-    avoid_text = f" Не повторяй эти блюда: {', '.join(past_titles)}." if past_titles else ""
-    usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}.{avoid_text}"
-    
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
     payload = {
         "model": "GigaChat",
         "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": usr_prompt}],
         "temperature": 0.9
     }
-    r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=35)
+    r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=40)
     if not r.text.strip():
         raise ValueError(f"GigaChat вернул пустой ответ (HTTP {r.status_code}). Попробуйте нажать кнопку еще раз.")
     r.raise_for_status()
+    return r.json()["choices"].pop(0)["message"]["content"]
 
-    text = r.json()["choices"].pop(0)["message"]["content"]
+def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
+    sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай максимальный акцент на высоком содержании белка, минимуме жиров/масла и точном подсчете граммов белка на порцию. " if sport_mode else ""
+    sys_prompt = (
+        "Ты креативный шеф-повар. Придумай оригинальное вкусное блюдо строго из переданных продуктов (можно добавить соль, перец, воду, масло, сахар). "
+        f"{sport_rule}"
+        "ВАЖНО: придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, теплые салаты, стир-фрай, сэндвичи, стейк, лазанья) и НЕ предлагай запеканки или омлеты, если об этом прямо не просят. "
+        "Оцени среднюю стоимость использованной граммовки продуктов в рублях по ценам магазинов России. "
+        "Оформи ответ строго с новой строки для каждой метки без символов # и *:\n"
+        "TITLE: Название блюда\nKEYWORD: 1 слово на английском (chicken, beef, steak, pasta, salad, lasagna, fish, soup, pancake, egg, rice, potato, sandwich, dessert)\n"
+        "TIME: Время готовки\nDIFF: Сложность (Легко/Средне/Сложно)\nCAL: Калории на 100г\nCOST: Общая примерная цена блюда в рублях (например: ~290 ₽)\n"
+        "MACROS: Б: ... | Ж: ... | У: ...\n"
+        "INGREDIENTS:\n- Ингредиент с граммовкой (~цена ₽ за это количество)\nSTEPS:\n1. Шаг приготовления\nTIP: Короткий совет шефа\n"
+        "PAIRING: Идеальный соус, гарнир или напиток к этому блюду"
+    )
+    avoid_text = f" Не повторяй эти блюда: {', '.join(past_titles)}." if past_titles else ""
+    usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}.{avoid_text}"
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt)
+
     data = {
-        "title": "Блюдо от шефа", "keyword": "chicken", "time": time_lim,
-        "diff": "Средне", "cal": "Не указано", "macros": "Сбалансировано",
+        "mode": "single", "title": "Блюдо от шефа", "keyword": "chicken", "time": time_lim,
+        "diff": "Средне", "cal": "Не указано", "cost": "~250 ₽", "macros": "Сбалансировано",
         "ings": [], "steps": [], "tip": "", "pairing": "", "photo": ""
     }
     mode = None
     for line in text.splitlines():
         s = line.strip().lstrip("#* ").rstrip("*")
-        if not s:
-            continue
+        if not s: continue
         if "TITLE:" in s: data["title"] = s.split("TITLE:", 1).pop().strip().strip('"«»*')
         elif "KEYWORD:" in s: data["keyword"] = s.split("KEYWORD:", 1).pop().strip().strip('*')
         elif "TIME:" in s: data["time"] = s.split("TIME:", 1).pop().strip().strip('*')
         elif "DIFF:" in s: data["diff"] = s.split("DIFF:", 1).pop().strip().strip('*')
         elif "CAL:" in s: data["cal"] = s.split("CAL:", 1).pop().strip().strip('*')
+        elif "COST:" in s: data["cost"] = s.split("COST:", 1).pop().strip().strip('*')
         elif "MACROS:" in s: data["macros"] = s.split("MACROS:", 1).pop().strip().strip('*')
         elif "TIP:" in s: data["tip"] = s.split("TIP:", 1).pop().strip().strip('*')
         elif "PAIRING:" in s: data["pairing"] = s.split("PAIRING:", 1).pop().strip().strip('*')
@@ -148,25 +159,85 @@ def fetch_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wis
     data["photo"] = find_dish_photo(data["keyword"])
     return data
 
+def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: bool) -> dict:
+    sport_rule = "Упор на высокий белок и чистый состав. " if sport_mode else ""
+    sys_prompt = (
+        "Ты диетолог и шеф-повар. Составь сбалансированный рацион на целый день (Завтрак, Обед, Ужин) максимально используя переданные продукты (можно добавить базовые специи, воду, масло, крупы). "
+        f"{sport_rule}Рассчитай примерную стоимость каждого приема пищи и общий итог в рублях. "
+        "Оформи ответ строго с новой строки для каждой метки без символов # и *:\n"
+        "TOTAL_COST: Общий бюджет за день (например: ~620 ₽)\n"
+        "TOTAL_CAL: Общая калорийность за день (например: ~1850 ккал)\n"
+        "TOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
+        "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_INFO: Краткий состав, граммовка, цена (~150 ₽) и 3-4 шага приготовления\n"
+        "LUNCH_TITLE: Название обеда\nLUNCH_INFO: Краткий состав, граммовка, цена (~270 ₽) и 3-4 шага приготовления\n"
+        "DINNER_TITLE: Название ужина\nDINNER_INFO: Краткий состав, граммовка, цена (~200 ₽) и 3-4 шага приготовления\n"
+        "TIP: Совет диетолога на день"
+    )
+    usr_prompt = f"Продукты: {', '.join(ingredients)}. Пожелания: {wishes or 'Сбалансированное питание'}."
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt)
+
+    data = {
+        "mode": "day", "title": "Рацион на день", "cost": "~600 ₽", "cal": "~1800 ккал",
+        "macros": "Сбалансировано", "b_title": "Завтрак", "b_info": "",
+        "l_title": "Обед", "l_info": "", "d_title": "Ужин", "d_info": "", "tip": "", "raw": text
+    }
+    curr = None
+    for line in text.splitlines():
+        s = line.strip().lstrip("#* ").rstrip("*")
+        if not s: continue
+        if "TOTAL_COST:" in s: data["cost"] = s.split("TOTAL_COST:", 1).pop().strip().strip('*')
+        elif "TOTAL_CAL:" in s: data["cal"] = s.split("TOTAL_CAL:", 1).pop().strip().strip('*')
+        elif "TOTAL_MACROS:" in s: data["macros"] = s.split("TOTAL_MACROS:", 1).pop().strip().strip('*')
+        elif "BREAKFAST_TITLE:" in s:
+            data["b_title"] = s.split("BREAKFAST_TITLE:", 1).pop().strip().strip('"«»*')
+            curr = "b"
+        elif "BREAKFAST_INFO:" in s:
+            data["b_info"] = s.split("BREAKFAST_INFO:", 1).pop().strip()
+            curr = "b"
+        elif "LUNCH_TITLE:" in s:
+            data["l_title"] = s.split("LUNCH_TITLE:", 1).pop().strip().strip('"«»*')
+            curr = "l"
+        elif "LUNCH_INFO:" in s:
+            data["l_info"] = s.split("LUNCH_INFO:", 1).pop().strip()
+            curr = "l"
+        elif "DINNER_TITLE:" in s:
+            data["d_title"] = s.split("DINNER_TITLE:", 1).pop().strip().strip('"«»*')
+            curr = "d"
+        elif "DINNER_INFO:" in s:
+            data["d_info"] = s.split("DINNER_INFO:", 1).pop().strip()
+            curr = "d"
+        elif "TIP:" in s:
+            data["tip"] = s.split("TIP:", 1).pop().strip().strip('*')
+            curr = None
+        elif curr == "b": data["b_info"] += "\n" + s
+        elif curr == "l": data["l_info"] += "\n" + s
+        elif curr == "d": data["d_info"] += "\n" + s
+
+    data["title"] = f"Рацион ({data['cost']})"
+    return data
+
 with st.sidebar:
     st.header("🔑 Настройки")
     saved_key = st.secrets.get("GIGACHAT_KEY", "") if hasattr(st, "secrets") else ""
     api_key = st.text_input("GigaChat Authorization Key:", value=saved_key, type="password")
     st.divider()
-    st.header("📜 История блюд")
+    st.header("📜 История генераций")
     if not st.session_state.history:
-        st.caption("Здесь появятся ваши сгенерированные рецепты.")
+        st.caption("Здесь появятся ваши рецепты и рационы.")
     else:
         for idx, item in enumerate(reversed(st.session_state.history)):
-            if st.button(f"🍽️ {item['title']}", key=f"hist_{idx}", use_container_width=True):
+            icon = "📅" if item.get("mode") == "day" else "🍽️"
+            if st.button(f"{icon} {item['title']}", key=f"hist_{idx}", use_container_width=True):
                 st.session_state.current = item
 
-st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов")
-st.caption("Умный подбор блюд из ваших продуктов с расчетом КБЖУ, спорт-режимом и визуализацией")
+st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов и рационов")
+st.caption("Умный подбор блюд и меню на день с расчетом КБЖУ, бюджета и спорт-режимом")
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
     with st.container(border=True):
+        gen_mode = st.radio("Режим работы:", ["🍲 Одно блюдо", "📅 Рацион на весь день"], horizontal=True)
+        st.divider()
         st.subheader("1. Продукты в наличии")
         catalog = {
             "🥩 Мясо и рыба": ["Куриное филе", "Говядина", "Свинина", "Фарш", "Рыба", "Яйца", "Сосиски", "Тунец"],
@@ -190,67 +261,9 @@ with col1:
 
         st.divider()
         st.subheader("2. Параметры")
-        c1, c2 = st.columns(2)
-        meal = c1.selectbox("Прием пищи:", ["Любой", "Завтрак", "Обед", "Ужин", "Перекус"])
-        time_lim = c2.selectbox("Время:", ["Не важно", "До 15 мин", "До 30 мин", "До 1 часа"])
-        sport_mode = st.toggle("💪 Спортивное / Белковое меню (высокий белок)")
-        wishes = st.text_input("✨ Пожелания (без жарки, острое и т.д.):")
-        btn = st.button("🔥 Придумать рецепт", type="primary", use_container_width=True)
-
-with col2:
-    with st.container(border=True):
-        st.subheader("🍽️ Готовый рецепт")
-        regen = False
-        if "current" in st.session_state:
-            regen = st.button("🔄 Другой вариант из этих же продуктов", use_container_width=True)
-
-        if btn or regen:
-            if not api_key:
-                st.error("⚠️ Введите Authorization Key в меню слева!")
-            elif not selected:
-                st.error("⚠️ Выберите хотя бы один продукт!")
-            else:
-                with st.spinner("Шеф-повар готовит рецепт..."):
-                    try:
-                        past = [item["title"] for item in st.session_state.history]
-                        res = fetch_recipe(api_key, selected, meal, time_lim, wishes, sport_mode, past)
-                        st.session_state.history.append(res)
-                        st.session_state.current = res
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"🚨 Ошибка: {e}")
-
-        if "current" in st.session_state:
-            rec = st.session_state.current
-            st.markdown(f"## {rec['title']}")
-            if rec.get("photo"):
-                st.image(rec["photo"], use_container_width=True)
-
-            m1, m2, m3 = st.columns(3)
-            m1.metric("⏱️ Время", rec["time"])
-            m2.metric("📊 Сложность", rec["diff"])
-            m3.metric("🔥 Калории", rec["cal"])
-            st.caption(f"**БЖУ:** {rec['macros']}")
-            st.divider()
-
-            st.markdown("### 🛒 Ингредиенты (отмечайте при готовке):")
-            for i, ing in enumerate(rec["ings"]):
-                st.checkbox(ing, key=f"ing_{rec['title']}_{i}")
-
-            st.markdown("### 👨‍🍳 Приготовление:")
-            for i, step in enumerate(rec["steps"], 1):
-                st.checkbox(f"**Шаг {i}.** {step}", key=f"step_{rec['title']}_{i}")
-
-            if rec.get("tip"):
-                st.success(f"💡 **Совет шефа:** {rec['tip']}")
-            if rec.get("pairing"):
-                st.info(f"🍷 **Идеальное дополнение:** {rec['pairing']}")
-
-            txt = f"{rec['title']}\n\nИнгредиенты:\n" + "\n".join(rec["ings"]) + "\n\nШаги:\n" + "\n".join(rec["steps"])
-            st.download_button("📥 Скачать рецепт (.txt)", txt, file_name="recipe.txt", use_container_width=True)
+        if gen_mode == "🍲 Одно блюдо":
+            c1, c2 = st.columns(2)
+            meal = c1.selectbox("Прием пищи:", ["Любой", "Завтрак", "Обед", "Ужин", "Перекус"])
+            time_lim = c2.selectbox("Время:", ["Не важно", "До 15 мин", "До 30 мин", "До 1 часа"])
         else:
-            st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
-            st.write("1. Отметьте продукты в меню слева или впишите свои через запятую.")
-            st.write("2. При необходимости включите **Спортивное меню** с повышенным белком.")
-            st.write("3. Нажмите **«Придумать рецепт»** — нейросеть рассчитает КБЖУ, подберет напиток и распишет шаги.")
-            st.info("💡 Все сгенерированные блюда сохраняются в левой панели — к ним можно вернуться в любой момент.")
+            meal, time_lim = "Весь день", "Не важно"
