@@ -141,18 +141,22 @@ def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str) -> str:
         r.raise_for_status()
         return r.json()["choices"].pop(0)["message"]["content"]
     raise ValueError("Сервер GigaChat сейчас перегружен одновременными запросами. Попробуйте через пару секунд.")
+def calc_total_rub(lines: list, fallback_str: str) -> str:
+    prices = [int(p) for line in lines for p in re.findall(r'(\d+)\s*(?:₽|руб)', line)]
+    return f"~{sum(prices)} ₽" if prices else fallback_str
+
 def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
     sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай акцент на высоком белке и минимуме жиров. " if sport_mode else ""
     sys_prompt = (
         "Ты креативный российский шеф-повар. Пиши СТРОГО на русском языке. Придумай вкусное блюдо из переданных продуктов (можно добавить воду и масло). "
         f"{sport_rule}Придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, салаты, сэндвичи, стейк, лазанья, яичница, омлет) и НЕ предлагай запеканки. "
-        "Оцени среднюю стоимость граммовки продуктов в рублях (РФ). "
+        "Оцени среднюю стоимость граммовки каждого продукта в рублях (РФ). "
         "Оформи ответ строго с новой строки для каждой метки, не пиши лишних слов перед метками:\n"
         "TITLE: Название блюда на русском\n"
         "KEYWORD: 1 слово (fried_eggs, omelette, pancake, sandwich, stew, meatloaf, steak, chicken, pasta, lasagna, soup, salad, rice, potato, fish, dessert)\n"
-        "TIME: Время\nDIFF: Сложность\nCAL: Калории на 100г\nCOST: Цена блюда (~290 ₽)\nMACROS: Б: ... | Ж: ... | У: ...\n"
+        "TIME: Время\nDIFF: Сложность\nCAL: Калории на 100г\nCOST: ~290 ₽\nMACROS: Б: ... | Ж: ... | У: ...\n"
         "SPICES: 3-4 конкретные специи и пряности, которые идеально подходят именно к этому блюду (только названия через запятую)\n"
-        "INGREDIENTS:\n- Ингредиент с граммовкой (~цена ₽)\n"
+        "INGREDIENTS:\n- Ингредиент (граммовка, цена ₽)\n"
         "STEPS:\n1. Первый шаг приготовления\n2. Второй шаг приготовления\n"
         "TIP: Короткий совет шефа\nPAIRING: Идеальный соус, гарнир или напиток"
     )
@@ -191,6 +195,7 @@ def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: s
         elif mode == "step":
             data["steps"].append(re.sub(r'^\d+[\.\)]\s*', '', s))
 
+    data["cost"] = calc_total_rub(data["ings"], data["cost"])
     data["photo"] = generate_exact_dish_photo(auth_key, data["title"], data["ings"], data["keyword"])
     return data
 
@@ -199,17 +204,17 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
     sys_prompt = (
         "Ты российский диетолог. Пиши все названия блюд, ингредиенты и шаги СТРОГО НА РУССКОМ ЯЗЫКЕ! "
         "Составь рацион на день (Завтрак, Обед, Ужин) из переданных продуктов (можно добавить воду, масло, крупы). "
-        f"{sport_rule}Посчитай примерную цену каждого приема пищи и итог за день в рублях. "
+        f"{sport_rule}Укажи примерную цену каждого ингредиента в рублях. "
         "Оформляй каждый ингредиент и шаг С НОВОЙ СТРОКИ! Строго по меткам без # и *:\n"
         "TOTAL_COST: ~620 ₽\nTOTAL_CAL: ~1850 ккал\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
         "BREAKFAST_TITLE: Название завтрака НА РУССКОМ\nBREAKFAST_KW: fried_eggs\n"
-        "BREAKFAST_INGS:\n- Продукт 1\n- Продукт 2\n"
+        "BREAKFAST_INGS:\n- Продукт 1 (граммовка, цена ₽)\n- Продукт 2 (граммовка, цена ₽)\n"
         "BREAKFAST_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
         "LUNCH_TITLE: Название обеда НА РУССКОМ\nLUNCH_KW: soup\n"
-        "LUNCH_INGS:\n- Продукт 1\n- Продукт 2\n"
+        "LUNCH_INGS:\n- Продукт 1 (граммовка, цена ₽)\n- Продукт 2 (граммовка, цена ₽)\n"
         "LUNCH_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
         "DINNER_TITLE: Название ужина НА РУССКОМ\nDINNER_KW: chicken\n"
-        "DINNER_INGS:\n- Продукт 1\n- Продукт 2\n"
+        "DINNER_INGS:\n- Продукт 1 (граммовка, цена ₽)\n- Продукт 2 (граммовка, цена ₽)\n"
         "DINNER_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
         "TIP: Совет диетолога на русском"
     )
@@ -250,6 +255,8 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
         elif curr == "d_ing": data["d_ings"].append(s.lstrip("-•* ").strip())
         elif curr == "d_step": data["d_steps"].append(re.sub(r'^\d+[\.\)]\s*', '', s))
 
+    all_day_ings = data["b_ings"] + data["l_ings"] + data["d_ings"]
+    data["cost"] = calc_total_rub(all_day_ings, data["cost"])
     data["b_photo"] = fallback_dish_photo(data["b_kw"])
     data["l_photo"] = fallback_dish_photo(data["l_kw"])
     data["d_photo"] = fallback_dish_photo(data["d_kw"])
