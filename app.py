@@ -69,8 +69,15 @@ API_URL = BASE_GIGA + "/chat/completions"
 if "history" not in st.session_state:
     st.session_state.history = []
 
+@st.cache_resource
+def get_http_session():
+    s = requests.Session()
+    s.verify = False
+    return s
+
 @st.cache_data(ttl=1500, show_spinner=False)
 def get_gigachat_token(auth_key: str) -> str:
+    sess = get_http_session()
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
@@ -79,47 +86,69 @@ def get_gigachat_token(auth_key: str) -> str:
     }
     for attempt in range(3):
         try:
-            r = requests.post(AUTH_URL, headers=headers, data={"scope": "GIGACHAT_API_PERS"}, verify=False, timeout=20)
+            r = sess.post(AUTH_URL, headers=headers, data={"scope": "GIGACHAT_API_PERS"}, timeout=15)
             if r.status_code == 200 and r.text.strip():
                 return r.json()["access_token"]
         except requests.exceptions.RequestException:
-            time.sleep(1)
+            time.sleep(0.8)
     raise ValueError("Ошибка авторизации Сбера. Проверьте ключ и интернет-соединение.")
 def fallback_dish_photo(keyword: str) -> str:
+    sess = get_http_session()
     m = "https://" + "www.themealdb." + "com/images/media/meals/"
     photos = {
-        "fried_eggs": m + "1550441882.jpg", "omelette": m + "ryppsv1511815505.jpg",
-        "pancake": m + "rwuyqx1511383174.jpg", "sandwich": m + "xr0n4r1576788363.jpg",
-        "stew": m + "sytuqu1511553755.jpg", "meatloaf": m + "vtqxtu1511784197.jpg",
-        "steak": m + "vussxq1511882648.jpg", "chicken": m + "wyxwsp1486979827.jpg",
-        "pasta": m + "ustsqw1468250014.jpg", "lasagna": m + "wtsvxx1511296896.jpg",
-        "soup": m + "1529446352.jpg", "salad": m + "wvpsxx1468256321.jpg",
-        "rice": m + "xxpqsy1511452222.jpg", "potato": m + "vrspxv1511722107.jpg",
-        "fish": m + "1548772327.jpg", "dessert": m + "wyrqqq1468233628.jpg"
+        "kebab": m + "tyywsw1505930373.jpg",
+        "shashlik": m + "tyywsw1505930373.jpg",
+        "fried_eggs": m + "1550441882.jpg",
+        "omelette": m + "ryppsv1511815505.jpg",
+        "porridge": m + "1549542992.jpg",
+        "pancake": m + "rwuyqx1511383174.jpg",
+        "sandwich": m + "xr0n4r1576788363.jpg",
+        "burger": m + "k420tj1585565244.jpg",
+        "pizza": m + "x0lk931587671540.jpg",
+        "pie": m + "wrssvt1511556563.jpg",
+        "stew": m + "sytuqu1511553755.jpg",
+        "meatloaf": m + "vtqxtu1511784197.jpg",
+        "cutlet": m + "vtqxtu1511784197.jpg",
+        "steak": m + "vussxq1511882648.jpg",
+        "chicken": m + "wyxwsp1486979827.jpg",
+        "pasta": m + "ustsqw1468250014.jpg",
+        "lasagna": m + "wtsvxx1511296896.jpg",
+        "soup": m + "1529446352.jpg",
+        "salad": m + "wvpsxx1468256321.jpg",
+        "rice": m + "xxpqsy1511452222.jpg",
+        "potato": m + "vrspxv1511722107.jpg",
+        "fish": m + "1548772327.jpg",
+        "shrimp": m + "1529445834.jpg",
+        "dessert": m + "wyrqqq1468233628.jpg"
     }
     kw = keyword.lower().strip()
     for key, url in photos.items():
         if key in kw or kw in key:
             return url
+    try:
+        api_search = "https://" + "www.themealdb." + "com/api/json/v1/1/search.php?s=" + kw
+        resp = sess.get(api_search, timeout=3).json()
+        if resp.get("meals"):
+            return resp["meals"].pop(0)["strMealThumb"]
+    except Exception:
+        pass
     return photos["stew"]
 
 def generate_exact_dish_photo(auth_key: str, dish_title: str, ings: list, fallback_kw: str) -> str:
     try:
+        sess = get_http_session()
         token = get_gigachat_token(auth_key)
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
         short_ings = ", ".join(ings[:4]) if ings else ""
-        prompt = (
-            f"Нарисуй реалистичную студийную фуд-фотографию высокого качества: {dish_title}. "
-            f"Ингредиенты в тарелке: {short_ings}. Резкий фокус, высокая детализация, ресторанная подача, естественный дневной свет, без текста."
-        )
+        prompt = f"Студийная фуд-фотография высокого качества: {dish_title}. Состав: {short_ings}. Резкий фокус, ресторанная подача, без текста."
         payload = {"model": "GigaChat", "messages": [{"role": "user", "content": prompt}], "function_call": "auto"}
-        r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=45)
+        r = sess.post(API_URL, headers=headers, json=payload, timeout=35)
         if r.status_code == 200:
             content = r.json()["choices"].pop(0)["message"]["content"]
             match = re.search(r'<img\s+src="([^"]+)"', content)
             if match:
                 file_id = match.group(1)
-                img_resp = requests.get(f"{BASE_GIGA}/files/{file_id}/content", headers={"Authorization": f"Bearer {token}"}, verify=False, timeout=30)
+                img_resp = sess.get(f"{BASE_GIGA}/files/{file_id}/content", headers={"Authorization": f"Bearer {token}"}, timeout=20)
                 if img_resp.status_code == 200 and img_resp.content:
                     b64 = base64.b64encode(img_resp.content).decode("utf-8")
                     return f"data:image/jpeg;base64,{b64}"
@@ -127,52 +156,53 @@ def generate_exact_dish_photo(auth_key: str, dish_title: str, ings: list, fallba
         pass
     return fallback_dish_photo(fallback_kw)
 
-def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str) -> str:
+def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str, max_tok: int = 550) -> str:
+    sess = get_http_session()
     token = get_gigachat_token(auth_key)
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json"}
     payload = {
         "model": "GigaChat",
         "messages": [{"role": "system", "content": sys_prompt}, {"role": "user", "content": usr_prompt}],
-        "temperature": 0.85
+        "temperature": 0.85,
+        "max_tokens": max_tok
     }
     for attempt in range(4):
         try:
-            r = requests.post(API_URL, headers=headers, json=payload, verify=False, timeout=40)
+            r = sess.post(API_URL, headers=headers, json=payload, timeout=25)
             if r.status_code == 429:
-                time.sleep(1.5 + attempt)
+                time.sleep(1.2 + attempt)
                 continue
             if not r.text.strip():
-                time.sleep(1)
+                time.sleep(0.8)
                 continue
             r.raise_for_status()
             return r.json()["choices"].pop(0)["message"]["content"]
         except requests.exceptions.RequestException:
             if attempt == 3:
-                raise ValueError("Не удалось соединиться с сервером GigaChat из-за сетевого сбоя. Нажмите кнопку еще раз.")
-            time.sleep(1.5)
+                raise ValueError("Сетевой сбой при связи с GigaChat. Нажмите кнопку еще раз.")
+            time.sleep(1.0)
     raise ValueError("Сервер GigaChat сейчас перегружен. Попробуйте через пару секунд.")
 def calc_total_rub(lines: list, fallback_str: str) -> str:
     prices = [int(p) for line in lines for p in re.findall(r'(\d+)\s*(?:₽|руб)', line)]
     return f"~{sum(prices)} ₽" if prices else fallback_str
 
-def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, past_titles: list) -> dict:
-    sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: сделай акцент на высоком белке и минимуме жиров. " if sport_mode else ""
+def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, ai_photo: bool, past_titles: list) -> dict:
+    sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: высокий белок, минимум жиров. " if sport_mode else ""
     sys_prompt = (
-        "Ты креативный российский шеф-повар. Пиши СТРОГО на русском языке. Придумай вкусное блюдо из переданных продуктов (можно добавить воду и масло). "
-        f"{sport_rule}Придумывай разнообразные форматы (вок, рагу, паста, рулеты, супы, салаты, сэндвичи, стейк, лазанья, яичница, омлет) и НЕ предлагай запеканки. "
-        "Оцени среднюю стоимость граммовки каждого продукта в рублях (РФ). "
-        "Оформи ответ строго с новой строки для каждой метки, не пиши лишних слов перед метками:\n"
-        "TITLE: Название блюда на русском\n"
-        "KEYWORD: 1 слово (fried_eggs, omelette, pancake, sandwich, stew, meatloaf, steak, chicken, pasta, lasagna, soup, salad, rice, potato, fish, dessert)\n"
+        "Ты российский шеф-повар. Пиши СТРОГО на русском, кратко и по делу. Придумай блюдо из переданных продуктов (можно добавить воду и масло). "
+        f"{sport_rule}Разнообразные форматы (вок, рагу, паста, рулеты, супы, салаты, сэндвичи, стейк, шашлык, лазанья, яичница, омлет, каша), БЕЗ запеканок. "
+        "Укажи среднюю цену каждого ингредиента в рублях (РФ). Строго с новой строки по меткам без # и *:\n"
+        "TITLE: Название блюда\n"
+        "KEYWORD: 1 английское слово блюда (kebab, fried_eggs, omelette, porridge, pancake, sandwich, burger, pizza, pie, stew, meatloaf, cutlet, steak, chicken, pasta, lasagna, soup, salad, rice, potato, fish, shrimp, dessert)\n"
         "TIME: Время\nDIFF: Сложность\nCAL: Калории на 100г\nCOST: ~290 ₽\nMACROS: Б: ... | Ж: ... | У: ...\n"
-        "SPICES: 3-4 конкретные специи и пряности, которые идеально подходят именно к этому блюду (только названия через запятую)\n"
+        "SPICES: 3-4 подходящие специи через запятую\n"
         "INGREDIENTS:\n- Ингредиент (граммовка, цена ₽)\n"
-        "STEPS:\n1. Первый шаг приготовления\n2. Второй шаг приготовления\n"
-        "TIP: Короткий совет шефа\nPAIRING: Идеальный соус, гарнир или напиток"
+        "STEPS:\n1. Короткий шаг 1\n2. Короткий шаг 2\n"
+        "TIP: Короткий совет\nPAIRING: Соус, гарнир или напиток"
     )
     avoid_text = f" Не повторяй: {', '.join(past_titles)}." if past_titles else ""
     usr_prompt = f"Продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}.{avoid_text}"
-    text = call_gigachat(auth_key, sys_prompt, usr_prompt)
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=550)
 
     data = {
         "mode": "single", "title": "Блюдо от шефа", "keyword": "stew", "time": time_lim,
@@ -206,30 +236,29 @@ def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: s
             data["steps"].append(re.sub(r'^\d+[\.\)]\s*', '', s))
 
     data["cost"] = calc_total_rub(data["ings"], data["cost"])
-    data["photo"] = generate_exact_dish_photo(auth_key, data["title"], data["ings"], data["keyword"])
+    data["photo"] = generate_exact_dish_photo(auth_key, data["title"], data["ings"], data["keyword"]) if ai_photo else fallback_dish_photo(data["keyword"])
     return data
 
 def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: bool) -> dict:
     sport_rule = "Упор на высокий белок. " if sport_mode else ""
     sys_prompt = (
-        "Ты российский диетолог. Пиши все названия блюд, ингредиенты и шаги СТРОГО НА РУССКОМ ЯЗЫКЕ! "
+        "Ты российский диетолог. Пиши СТРОГО НА РУССКОМ и кратко! "
         "Составь рацион на день (Завтрак, Обед, Ужин) из переданных продуктов (можно добавить воду, масло, крупы). "
-        f"{sport_rule}Укажи примерную цену каждого ингредиента в рублях. "
-        "Оформляй каждый ингредиент и шаг С НОВОЙ СТРОКИ! Строго по меткам без # и *:\n"
+        f"{sport_rule}Укажи цену каждого ингредиента в рублях. Каждый пункт С НОВОЙ СТРОКИ по меткам без # и *:\n"
         "TOTAL_COST: ~620 ₽\nTOTAL_CAL: ~1850 ккал\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
-        "BREAKFAST_TITLE: Название завтрака НА РУССКОМ\nBREAKFAST_KW: fried_eggs\n"
-        "BREAKFAST_INGS:\n- Продукт 1 (граммовка, цена ₽)\n- Продукт 2 (граммовка, цена ₽)\n"
-        "BREAKFAST_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
-        "LUNCH_TITLE: Название обеда НА РУССКОМ\nLUNCH_KW: soup\n"
-        "LUNCH_INGS:\n- Продукт 1 (граммовка, цена ₽)\n- Продукт 2 (граммовка, цена ₽)\n"
-        "LUNCH_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
-        "DINNER_TITLE: Название ужина НА РУССКОМ\nDINNER_KW: chicken\n"
-        "DINNER_INGS:\n- Продукт 1 (граммовка, цена ₽)\n- Продукт 2 (граммовка, цена ₽)\n"
-        "DINNER_STEPS:\n1. Первый шаг\n2. Второй шаг\n"
-        "TIP: Совет диетолога на русском"
+        "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_KW: fried_eggs\n"
+        "BREAKFAST_INGS:\n- Продукт 1 (граммовка, цена ₽)\n"
+        "BREAKFAST_STEPS:\n1. Короткий шаг\n"
+        "LUNCH_TITLE: Название обеда\nLUNCH_KW: soup\n"
+        "LUNCH_INGS:\n- Продукт 1 (граммовка, цена ₽)\n"
+        "LUNCH_STEPS:\n1. Короткий шаг\n"
+        "DINNER_TITLE: Название ужина\nDINNER_KW: chicken\n"
+        "DINNER_INGS:\n- Продукт 1 (граммовка, цена ₽)\n"
+        "DINNER_STEPS:\n1. Короткий шаг\n"
+        "TIP: Короткий совет диетолога"
     )
     usr_prompt = f"Продукты: {', '.join(ingredients)}. Пожелания: {wishes or 'Сбалансированно'}."
-    text = call_gigachat(auth_key, sys_prompt, usr_prompt)
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=750)
 
     data = {
         "mode": "day", "title": "Рацион на день", "cost": "~600 ₽", "cal": "~1800 ккал", "macros": "Сбалансировано",
@@ -287,7 +316,7 @@ with st.sidebar:
                 st.session_state.current = item
 
 st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов и рационов")
-st.caption("Умный подбор блюд и меню на день с расчетом КБЖУ, бюджета и спорт-режимом")
+st.caption("Быстрый подбор блюд и меню на день с расчетом КБЖУ, бюджета и спорт-режимом")
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
@@ -326,6 +355,7 @@ with col1:
             st.caption("ИИ-диетолог распределит выбранные продукты на Завтрак, Обед и Ужин.")
 
         sport_mode = st.toggle("💪 Спортивное / Белковое меню (высокий белок)")
+        ai_photo = st.toggle("🎨 Рисовать уникальное фото ИИ (+12 сек)", value=False)
         wishes = st.text_input("✨ Пожелания (бюджет до 600р, ПП, без жарки):")
         btn_label = "🔥 Придумать рецепт" if gen_mode == "🍲 Одно блюдо" else "📅 Составить рацион на день"
         btn = st.button(btn_label, type="primary", use_container_width=True)
@@ -343,11 +373,11 @@ with col2:
             elif not selected:
                 st.error("⚠️ Выберите хотя бы один продукт!")
             else:
-                with st.spinner("Шеф-повар готовит рецепт и создает фото блюда..."):
+                with st.spinner("Шеф-повар готовит рецепт..."):
                     try:
                         if gen_mode == "🍲 Одно блюдо" or regen:
                             past = [item["title"] for item in st.session_state.history if item.get("mode") == "single"]
-                            res = fetch_single_recipe(api_key, selected, meal, time_lim, wishes, sport_mode, past)
+                            res = fetch_single_recipe(api_key, selected, meal, time_lim, wishes, sport_mode, ai_photo, past)
                         else:
                             res = fetch_day_ration(api_key, selected, wishes, sport_mode)
                         st.session_state.history.append(res)
@@ -425,5 +455,5 @@ with col2:
             st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
             st.write("1. Выберите режим: **Одно блюдо** или **Рацион на весь день**.")
             st.write("2. Отметьте продукты в меню слева или впишите свои через запятую.")
-            st.write("3. Нажмите кнопку генерации — нейросеть рассчитает КБЖУ, бюджет, подберет специи и создаст фото.")
+            st.write("3. Нажмите кнопку генерации — нейросеть за пару секунд рассчитает КБЖУ, бюджет и подберет специи.")
             st.info("💡 Все сгенерированные блюда и рационы сохраняются в левой панели.")
