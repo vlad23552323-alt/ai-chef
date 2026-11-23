@@ -278,15 +278,17 @@ def fetch_recipe_ideas(auth_key: str, ingredients: list, meal: str, time_lim: st
     sys_prompt = (
         "Ты опытный шеф-повар. Тебе передан список доступных продуктов. "
         "ВАЖНОЕ ПРАВИЛО: НЕ нужно использовать все продукты сразу! Выбери для каждого блюда только 3-5 гармонично сочетающихся ингредиентов (не смешивай несовместимое вроде рыбы, сосисок и творога). "
-        f"{sport_rule}Придумай 3 РАЗНЫХ варианта блюд (разные форматы: суп, паста, салат, жаркое, шашлык, рулет, вок, омлет и т.д.). "
-        "Оформи ответ строго по 3 строкам без лишнего текста:\n"
+        f"{sport_rule}Придумай 5 РАЗНЫХ вариантов блюд (разные форматы: суп, паста, салат, жаркое, шашлык, рулет, вок, омлет, запеканка и т.д.). "
+        "Оформи ответ строго по 5 строкам без лишнего текста:\n"
         "IDEA: Название блюда 1 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание (из каких 3-5 продуктов готовится)\n"
         "IDEA: Название блюда 2 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
-        "IDEA: Название блюда 3 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание"
+        "IDEA: Название блюда 3 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
+        "IDEA: Название блюда 4 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
+        "IDEA: Название блюда 5 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание"
     )
     avoid_text = f" Исключи блюда: {', '.join(past_titles)}." if past_titles else ""
     usr_prompt = f"Доступные продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}.{avoid_text}"
-    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=450)
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=650)
     ideas = []
     for line in text.splitlines():
         s = re.sub(r'^(МЕТА\d*:|META\d*:|\s|[#*])+', '', line).strip()
@@ -294,14 +296,13 @@ def fetch_recipe_ideas(auth_key: str, ingredients: list, meal: str, time_lim: st
             raw = s.split(":", 1).pop().strip()
             parts = [p.strip() for p in raw.split("|")]
             if len(parts) >= 2:
-                ideas.append({
-                    "title": parts,
-                    "time": parts if len(parts) > 1 else time_lim,
-                    "cal": parts if len(parts) > 2 else "180 ккал",
-                    "cost": parts if len(parts) > 3 else "~220 ₽",
-                    "desc": parts if len(parts) > 4 else ""
-                })
-    return ideas[:3]
+                p_title = parts.pop(0)
+                p_time = parts.pop(0) if parts else time_lim
+                p_cal = parts.pop(0) if parts else "180 ккал"
+                p_cost = parts.pop(0) if parts else "~220 ₽"
+                p_desc = parts.pop(0) if parts else ""
+                ideas.append({"title": p_title, "time": p_time, "cal": p_cal, "cost": p_cost, "desc": p_desc})
+    return ideas[:5]
 def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, ai_photo: bool, chosen_title: str = "") -> dict:
     sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: высокий белок, минимум жиров. " if sport_mode else ""
     dish_focus = f"Приготовь именно это блюдо: «{chosen_title}». " if chosen_title else "Придумай вкусное блюдо. "
@@ -438,12 +439,12 @@ with st.sidebar:
                 st.session_state.current = item
 
 st.title("👨‍🍳 AI-Шеф Про: Генератор рецептов и рационов")
-st.caption("Точный расчёт калорий и стоимости граммовки, выбор из 3 блюд и подробные шаги")
+st.caption("Точный расчёт калорий и стоимости граммовки, выбор из 5 блюд и подробные шаги")
 col1, col2 = st.columns([1, 1.3], gap="large")
 
 with col1:
     with st.container(border=True):
-        gen_mode = st.radio("Режим работы:", ["🍲 Варианты блюд (3 на выбор)", "📅 Рацион на весь день"], horizontal=True)
+        gen_mode = st.radio("Режим работы:", ["🍲 Варианты блюд (5 на выбор)", "📅 Рацион на весь день"], horizontal=True)
         st.divider()
         st.subheader("1. Продукты в наличии")
         st.caption("Можно отметить хоть всё — шеф сам выберет 3–5 сочетаемых продуктов для каждого блюда.")
@@ -480,7 +481,7 @@ with col1:
         sport_mode = st.toggle("💪 Спортивное / Белковое меню (высокий белок)")
         ai_photo = st.toggle("🎨 Рисовать уникальные фото нейросетью (+10 сек)", value=False)
         wishes = st.text_input("✨ Пожелания (бюджет до 600р, ПП, без жарки):")
-        btn_label = "🔥 Подобрать 3 блюда на выбор" if "Варианты" in gen_mode else "📅 Составить рацион на день"
+        btn_label = "🔥 Подобрать 5 блюд на выбор" if "Варианты" in gen_mode else "📅 Составить рацион на день"
         btn = st.button(btn_label, type="primary", use_container_width=True)
 
 with col2:
@@ -493,7 +494,7 @@ with col2:
             elif not selected:
                 st.error("⚠️ Выберите хотя бы один продукт!")
             else:
-                with st.spinner("Шеф-повар подбирает сочетания и рассчитывает КБЖУ..."):
+                with st.spinner("Шеф-повар подбирает 5 сочетаний и рассчитывает КБЖУ..."):
                     try:
                         if "Варианты" in gen_mode:
                             past = [item["title"] for item in st.session_state.history if item.get("mode") == "single"]
@@ -508,7 +509,7 @@ with col2:
                         st.error(f"🚨 Ошибка: {e}")
 
         if st.session_state.ideas:
-            st.markdown("### 🎯 Выберите одно из 3 предложенных блюд:")
+            st.markdown("### 🎯 Выберите одно из 5 предложенных блюд:")
             for idx, idea in enumerate(st.session_state.ideas):
                 with st.container(border=True):
                     c_info, c_btn = st.columns([3, 1.2])
@@ -593,6 +594,6 @@ with col2:
         elif not st.session_state.ideas:
             st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
             st.write("1. Отметьте продукты в меню слева (можно выбрать хоть весь холодильник — шеф сам отберет сочетаемые).")
-            st.write("2. Нажмите **«Подобрать 3 блюда на выбор»** и кликните на понравившийся вариант.")
+            st.write("2. Нажмите **«Подобрать 5 блюд на выбор»** и кликните на понравившийся вариант.")
             st.write("3. Или переключитесь на **«Рацион на весь день»** для готового меню с фото и точным бюджетом.")
             st.info("💡 Все открытые рецепты и рационы сохраняются в левой панели.")
