@@ -11,6 +11,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="AI-Шеф Про", page_icon="👨‍🍳", layout="wide")
 
 components.html("""
+<img src="https://yandex.ru" style="width:1px; height:1px; opacity:0;" alt="" />
 <script type="text/javascript">
     (function(m,e,t,r,i,k,a){
         m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -18,10 +19,9 @@ components.html("""
         for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
         k=e.createElement(t),a=e.getElementsByTagName(t),k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
     })(window, document,'script','https://yandex.ru', 'ym');
-
-    ym(114622085, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    ym(114622085, 'init', {clickmap:true, trackLinks:true, accurateTrackBounce:true});
 </script>
-""", height=0, width=0)
+""", height=1, width=1)
 
 st.markdown("""
 <style>
@@ -75,10 +75,18 @@ div.stButton > button[kind="primary"]:hover {
 }
 </style>
 """, unsafe_allow_html=True)
-
 AUTH_URL = "https://" + "ngw.devices.sberbank.ru:9443" + "/api/v2/oauth"
 BASE_GIGA = "https://" + "gigachat.devices.sberbank.ru" + "/api/v1"
 API_URL = BASE_GIGA + "/chat/completions"
+
+@st.cache_resource
+def get_live_stats():
+    return {"visits": 0, "recipes": 0}
+
+stats = get_live_stats()
+if "counted_visit" not in st.session_state:
+    st.session_state.counted_visit = True
+    stats["visits"] += 1
 
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -115,10 +123,8 @@ def fallback_dish_photo(keyword: str, title_ru: str = "") -> str:
     api_base = "https://" + "www.themealdb." + "com/api/json/v1/1/"
 
     photos = {
-        "omelette": m + "g373701551450225.jpg",
-        "shakshuka": m + "g373701551450225.jpg",
-        "fried_eggs": m + "1550441882.jpg",
-        "eggs": m + "1550441882.jpg",
+        "omelette": m + "g373701551450225.jpg", "shakshuka": m + "g373701551450225.jpg",
+        "fried_eggs": m + "1550441882.jpg", "eggs": m + "1550441882.jpg",
         "kebab": m + "tyywsw1505930373.jpg", "shashlik": m + "tyywsw1505930373.jpg",
         "porridge": m + "1549542992.jpg", "oatmeal": m + "1549542992.jpg",
         "pancake": m + "rwuyqx1511383174.jpg", "cheesecake": m + "rwuyqx1511383174.jpg",
@@ -209,22 +215,16 @@ PROD_DB = {
 }
 
 def recalculate_nutrition_and_cost(ings: list, fallback_cal: str, fallback_cost: str):
-    total_grams = 0
-    total_kcal = 0.0
-    total_rub = 0.0
+    total_grams, total_kcal, total_rub = 0, 0.0, 0.0
     updated_ings = []
-
     for line in ings:
         low = line.lower()
         g_match = re.search(r'(\d+)\s*(?:г|гр|мл)\b', low)
         kg_match = re.search(r'(\d+(?:[.,]\d+)?)\s*кг\b', low)
         pcs_match = re.search(r'(\d+)\s*(?:шт|зубч)', low)
-
         grams = 0
-        if g_match:
-            grams = int(g_match.group(1))
-        elif kg_match:
-            grams = int(float(kg_match.group(1).replace(",", ".")) * 1000)
+        if g_match: grams = int(g_match.group(1))
+        elif kg_match: grams = int(float(kg_match.group(1).replace(",", ".")) * 1000)
         elif pcs_match:
             cnt = int(pcs_match.group(1))
             grams = cnt * (5 if "чеснок" in low or "зубч" in low else (55 if "яйц" in low else 100))
@@ -245,20 +245,14 @@ def recalculate_nutrition_and_cost(ings: list, fallback_cal: str, fallback_cost:
             updated_ings.append(f"{clean_name} (~{item_rub} ₽)")
         else:
             p_match = re.findall(r'(\d+)\s*(?:₽|руб)', low)
-            if p_match:
-                total_rub += int(p_match.pop(0))
+            if p_match: total_rub += int(p_match.pop(0))
             if grams > 0:
                 total_grams += grams
                 total_kcal += (grams / 100.0) * 120
             updated_ings.append(line)
 
     final_cost = f"~{int(round(total_rub))} ₽" if total_rub > 0 else fallback_cost
-    if total_grams > 0 and total_kcal > 0:
-        avg_kcal = int(round((total_kcal / total_grams) * 100))
-        final_cal = f"{avg_kcal} ккал"
-    else:
-        final_cal = fallback_cal
-
+    final_cal = f"{int(round((total_kcal / total_grams) * 100))} ккал" if (total_grams > 0 and total_kcal > 0) else fallback_cal
     return updated_ings, final_cal, final_cost
 def call_gigachat(auth_key: str, sys_prompt: str, usr_prompt: str, max_tok: int = 1100) -> str:
     sess = get_http_session()
@@ -294,7 +288,7 @@ def fetch_recipe_ideas(auth_key: str, ingredients: list, meal: str, time_lim: st
         "ВАЖНОЕ ПРАВИЛО: НЕ нужно использовать все продукты сразу! Выбери для каждого блюда только 3-5 гармонично сочетающихся ингредиентов (не смешивай несовместимое вроде рыбы, сосисок и творога). "
         f"{sport_rule}Придумай 5 РАЗНЫХ вариантов блюд (разные форматы: суп, паста, салат, жаркое, шашлык, рулет, вок, омлет, запеканка и т.д.). "
         "Оформи ответ строго по 5 строкам без лишнего текста:\n"
-        "IDEA: Название блюда 1 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание (из каких 3-5 продуктов готовится)\n"
+        "IDEA: Название блюда 1 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
         "IDEA: Название блюда 2 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
         "IDEA: Название блюда 3 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
         "IDEA: Название блюда 4 | Время | Калории на 100г | Примерная цена ₽ | Краткое описание\n"
@@ -430,8 +424,7 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
     data["l_ings"], _, l_cost = recalculate_nutrition_and_cost(data["l_ings"], "", "~250 ₽")
     data["d_ings"], _, d_cost = recalculate_nutrition_and_cost(data["d_ings"], "", "~200 ₽")
     day_sum = sum(int(re.sub(r'\D', '', c) or 0) for c in [b_cost, l_cost, d_cost])
-    if day_sum > 0:
-        data["cost"] = f"~{day_sum} ₽"
+    if day_sum > 0: data["cost"] = f"~{day_sum} ₽"
 
     data["b_photo"] = get_dish_image(auth_key, data["b_title"], data["b_ings"], data["b_kw"], ai_photo)
     data["l_photo"] = get_dish_image(auth_key, data["l_title"], data["l_ings"], data["l_kw"], ai_photo)
@@ -442,6 +435,11 @@ with st.sidebar:
     st.header("🔑 Настройки")
     saved_key = st.secrets.get("GIGACHAT_KEY", "") if hasattr(st, "secrets") else ""
     api_key = st.text_input("GigaChat Authorization Key:", value=saved_key, type="password")
+    st.divider()
+    st.header("📊 Статистика сайта")
+    s1, s2 = st.columns(2)
+    s1.metric("👥 Визитов", stats["visits"])
+    s2.metric("🍲 Блюд", stats["recipes"])
     st.divider()
     st.header("📜 История генераций")
     if not st.session_state.history:
@@ -513,8 +511,10 @@ with col2:
                         if "Варианты" in gen_mode:
                             past = [item["title"] for item in st.session_state.history if item.get("mode") == "single"]
                             st.session_state.ideas = fetch_recipe_ideas(api_key, selected, meal, time_lim, wishes, sport_mode, past)
+                            stats["recipes"] += 1
                         else:
                             res = fetch_day_ration(api_key, selected, wishes, sport_mode, ai_photo)
+                            stats["recipes"] += 1
                             st.session_state.history.append(res)
                             st.session_state.current = res
                             st.session_state.ideas = []
@@ -533,6 +533,7 @@ with col2:
                         with st.spinner(f"Расписываю рецепт и считаю граммовку: {idea['title']}..."):
                             try:
                                 res = fetch_single_recipe(api_key, selected, meal, time_lim, wishes, sport_mode, ai_photo, idea["title"])
+                                stats["recipes"] += 1
                                 st.session_state.history.append(res)
                                 st.session_state.current = res
                                 st.rerun()
