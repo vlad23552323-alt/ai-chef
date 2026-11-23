@@ -19,7 +19,7 @@ components.html("""
         for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
         k=e.createElement(t),a=e.getElementsByTagName(t),k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
     })(window, document,'script','https://yandex.ru', 'ym');
-    ym(114622085, 'init', {clickmap:true, trackLinks:true, accurateTrackBounce:true});
+    ym(114622085, 'init', {url: 'https://streamlit.app', clickmap:true, trackLinks:true, accurateTrackBounce:true});
 </script>
 """, height=1, width=1)
 
@@ -364,7 +364,6 @@ def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: s
     data["ings"], data["cal"], data["cost"] = recalculate_nutrition_and_cost(data["ings"], data["cal"], data["cost"])
     data["photo"] = get_dish_image(auth_key, data["title"], data["ings"], data["keyword"], ai_photo)
     return data
-
 def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: bool, ai_photo: bool) -> dict:
     sport_rule = "Упор на высокий белок. " if sport_mode else ""
     sys_prompt = (
