@@ -121,6 +121,7 @@ def get_gigachat_token(auth_key: str) -> str:
         except requests.exceptions.RequestException:
             time.sleep(0.8)
     raise ValueError("Ошибка авторизации Сбера. Проверьте ключ и интернет-соединение.")
+
 @st.cache_data(ttl=86400, show_spinner=False)
 def fallback_dish_photo(keyword: str, title_ru: str = "") -> str:
     sess = get_http_session()
@@ -316,9 +317,10 @@ def fetch_recipe_ideas(auth_key: str, ingredients: list, meal: str, time_lim: st
                 p_desc = parts.pop(0) if parts else ""
                 ideas.append({"title": p_title, "time": p_time, "cal": p_cal, "cost": p_cost, "desc": p_desc})
     return ideas[:5]
+
 def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: str, wishes: str, sport_mode: bool, ai_photo: bool, chosen_title: str = "") -> dict:
     sport_rule = "РЕЖИМ СПОРТ-ПИТАНИЯ: высокий белок, минимум жиров. " if sport_mode else ""
-    dish_focus = f"Приготовь именно это блюдо: «{chosen_title}». " if chosen_title else "Придумай вкусное блюдо. "
+    dish_focus = f"Приготовь именно это блюдо: {chosen_title}. " if chosen_title else "Придумай вкусное блюдо. "
     sys_prompt = (
         f"Ты российский шеф-повар. Пиши СТРОГО на русском языке. {dish_focus}"
         "ВАЖНО: возьми из списка доступных продуктов ТОЛЬКО те 3-6 ингредиентов, которые реально подходят для этого рецепта (игнорируй остальные несочетаемые продукты, можно добавить воду и масло). "
@@ -373,18 +375,18 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
     sport_rule = "Упор на высокий белок. " if sport_mode else ""
     sys_prompt = (
         "Ты российский диетолог. Пиши СТРОГО НА РУССКОМ языке! "
-        "Составь сбалансированный рацион на день (Завтрак, Обед, Ужин) из переданных продуктов. "
-        "КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО: каждый ингредиент, упомянутый в названии блюда (например, рис, сыр, картофель, овощи), ОБЯЗАТЕЛЬНО должен быть указан в списке ингредиентов с точной граммовкой и в шагах приготовления! "
-        f"{sport_rule}Распиши шаги подробно с временем и температурой. Каждый пункт С НОВОЙ СТРОКИ по меткам без # и *:\n"
+        "Составь рацион на день (Завтрак, Обед, Ужин) из переданных продуктов. "
+        "ОБЯЗАТЕЛЬНО пиши КАЖДЫЙ ингредиент С НОВОЙ СТРОКИ через дефис и укажи минимум 3-4 ингредиента для каждого приема пищи! "
+        f"{sport_rule}Каждый пункт С НОВОЙ СТРОКИ по меткам без # и *:\n"
         "TOTAL_COST: ~620 ₽\nTOTAL_CAL: ~1850 ккал\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
         "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_KW: omelette\n"
-        "BREAKFAST_INGS:\n- Продукт 1 — 150 г\n- Продукт 2 — 50 г\n"
+        "BREAKFAST_INGS:\n- Яйца — 3 шт\n- Помидоры — 100 г\n- Сыр твердый — 40 г\n"
         "BREAKFAST_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
         "LUNCH_TITLE: Название обеда\nLUNCH_KW: soup\n"
-        "LUNCH_INGS:\n- Продукт 1 — 200 г\n- Продукт 2 — 150 г\n"
+        "LUNCH_INGS:\n- Куриное филе — 200 г\n- Картофель — 150 г\n- Морковь — 60 г\n"
         "LUNCH_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
-        "DINNER_TITLE: Название ужина\nDINNER_KW: chicken\n"
-        "DINNER_INGS:\n- Продукт 1 — 200 г\n- Продукт 2 — 100 г\n- Продукт 3 — 50 г\n"
+        "DINNER_TITLE: Название ужина\nDINNER_KW: pilaf\n"
+        "DINNER_INGS:\n- Куриное филе — 200 г\n- Рис — 100 г\n- Морковь — 50 г\n- Лук — 50 г\n"
         "DINNER_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
         "TIP: Подробный совет диетолога"
     )
@@ -407,16 +409,25 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
         elif "TOTAL_MACROS:" in upper_s: data["macros"] = s.split(":", 1).pop().strip().strip('*')
         elif "BREAKFAST_TITLE:" in upper_s: data["b_title"] = s.split(":", 1).pop().strip().strip('"«»*')
         elif "BREAKFAST_KW:" in upper_s: data["b_kw"] = s.split(":", 1).pop().strip().strip('*')
-        elif upper_s.startswith("BREAKFAST_INGS"): curr = "b_ing"
-        elif upper_s.startswith("BREAKFAST_STEPS"): curr = "b_step"
+        elif "BREAKFAST_INGS" in upper_s:
+            curr = "b_ing"
+            rest = s.split(":", 1).pop().strip() if ":" in s else ""
+            if rest: data["b_ings"].extend([x.strip("-•* ") for x in rest.split(",") if x.strip()])
+        elif "BREAKFAST_STEPS" in upper_s: curr = "b_step"
         elif "LUNCH_TITLE:" in upper_s: data["l_title"] = s.split(":", 1).pop().strip().strip('"«»*')
         elif "LUNCH_KW:" in upper_s: data["l_kw"] = s.split(":", 1).pop().strip().strip('*')
-        elif upper_s.startswith("LUNCH_INGS"): curr = "l_ing"
-        elif upper_s.startswith("LUNCH_STEPS"): curr = "l_step"
+        elif "LUNCH_INGS" in upper_s:
+            curr = "l_ing"
+            rest = s.split(":", 1).pop().strip() if ":" in s else ""
+            if rest: data["l_ings"].extend([x.strip("-•* ") for x in rest.split(",") if x.strip()])
+        elif "LUNCH_STEPS" in upper_s: curr = "l_step"
         elif "DINNER_TITLE:" in upper_s: data["d_title"] = s.split(":", 1).pop().strip().strip('"«»*')
         elif "DINNER_KW:" in upper_s: data["d_kw"] = s.split(":", 1).pop().strip().strip('*')
-        elif upper_s.startswith("DINNER_INGS"): curr = "d_ing"
-        elif upper_s.startswith("DINNER_STEPS"): curr = "d_step"
+        elif "DINNER_INGS" in upper_s:
+            curr = "d_ing"
+            rest = s.split(":", 1).pop().strip() if ":" in s else ""
+            if rest: data["d_ings"].extend([x.strip("-•* ") for x in rest.split(",") if x.strip()])
+        elif "DINNER_STEPS" in upper_s: curr = "d_step"
         elif "TIP:" in upper_s: data["tip"] = s.split(":", 1).pop().strip().strip('*'); curr = None
         elif curr == "b_ing": data["b_ings"].append(s.lstrip("-•* ").strip())
         elif curr == "b_step": data["b_steps"].append(re.sub(r'^\d+[\.\)]\s*', '', s))
@@ -424,6 +435,14 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
         elif curr == "l_step": data["l_steps"].append(re.sub(r'^\d+[\.\)]\s*', '', s))
         elif curr == "d_ing": data["d_ings"].append(s.lstrip("-•* ").strip())
         elif curr == "d_step": data["d_steps"].append(re.sub(r'^\d+[\.\)]\s*', '', s))
+
+    must_have = {"рис": "Рис — 100 г", "гречк": "Гречка — 100 г", "картоф": "Картофель — 150 г", "сыр": "Сыр твердый — 40 г", "овощ": "Овощи (морковь, лук) — 120 г", "помидор": "Помидоры — 100 г", "яйц": "Яйца — 2 шт"}
+    for t_key, i_key in [("b_title", "b_ings"), ("l_title", "l_ings"), ("d_title", "d_ings")]:
+        t_low = data[t_key].lower()
+        joined_ings = " ".join(data[i_key]).lower()
+        for stem, default_line in must_have.items():
+            if stem in t_low and stem not in joined_ings:
+                data[i_key].append(default_line)
 
     data["b_ings"], _, b_cost = recalculate_nutrition_and_cost(data["b_ings"], "", "~150 ₽")
     data["l_ings"], _, l_cost = recalculate_nutrition_and_cost(data["l_ings"], "", "~250 ₽")
