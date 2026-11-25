@@ -333,7 +333,7 @@ def fetch_single_recipe(auth_key: str, ingredients: list, meal: str, time_lim: s
         "TIP: Полезный кулинарный секрет шефа\nPAIRING: Соус, гарнир или напиток"
     )
     usr_prompt = f"Доступные продукты: {', '.join(ingredients)}. Прием пищи: {meal}. Время: {time_lim}. Пожелания: {wishes or 'Нет'}."
-    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=1100)
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=1200)
 
     data = {
         "mode": "single", "title": chosen_title or "Блюдо от шефа", "keyword": "stew", "time": time_lim,
@@ -373,22 +373,23 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
     sport_rule = "Упор на высокий белок. " if sport_mode else ""
     sys_prompt = (
         "Ты российский диетолог. Пиши СТРОГО НА РУССКОМ языке! "
-        "Составь сбалансированный рацион на день (Завтрак, Обед, Ужин) из переданных продуктов (для каждого приема пищи выбирай только сочетаемые продукты; обязательно указывай граммовку в граммах или штуках). "
+        "Составь сбалансированный рацион на день (Завтрак, Обед, Ужин) из переданных продуктов. "
+        "КРИТИЧЕСКИ ВАЖНОЕ ПРАВИЛО: каждый ингредиент, упомянутый в названии блюда (например, рис, сыр, картофель, овощи), ОБЯЗАТЕЛЬНО должен быть указан в списке ингредиентов с точной граммовкой и в шагах приготовления! "
         f"{sport_rule}Распиши шаги подробно с временем и температурой. Каждый пункт С НОВОЙ СТРОКИ по меткам без # и *:\n"
         "TOTAL_COST: ~620 ₽\nTOTAL_CAL: ~1850 ккал\nTOTAL_MACROS: Б: ...г | Ж: ...г | У: ...г\n"
         "BREAKFAST_TITLE: Название завтрака\nBREAKFAST_KW: omelette\n"
-        "BREAKFAST_INGS:\n- Продукт 1 — 150 г\n"
-        "BREAKFAST_STEPS:\n1. Подробный шаг\n"
+        "BREAKFAST_INGS:\n- Продукт 1 — 150 г\n- Продукт 2 — 50 г\n"
+        "BREAKFAST_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
         "LUNCH_TITLE: Название обеда\nLUNCH_KW: soup\n"
-        "LUNCH_INGS:\n- Продукт 1 — 200 г\n"
-        "LUNCH_STEPS:\n1. Подробный шаг\n"
+        "LUNCH_INGS:\n- Продукт 1 — 200 г\n- Продукт 2 — 150 г\n"
+        "LUNCH_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
         "DINNER_TITLE: Название ужина\nDINNER_KW: chicken\n"
-        "DINNER_INGS:\n- Продукт 1 — 200 г\n"
-        "DINNER_STEPS:\n1. Подробный шаг\n"
+        "DINNER_INGS:\n- Продукт 1 — 200 г\n- Продукт 2 — 100 г\n- Продукт 3 — 50 г\n"
+        "DINNER_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
         "TIP: Подробный совет диетолога"
     )
     usr_prompt = f"Доступные продукты: {', '.join(ingredients)}. Пожелания: {wishes or 'Сбалансированно'}."
-    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=1200)
+    text = call_gigachat(auth_key, sys_prompt, usr_prompt, max_tok=2200)
 
     data = {
         "mode": "day", "title": "Рацион на день", "cost": "~600 ₽", "cal": "~1800 ккал", "macros": "Сбалансировано",
@@ -613,6 +614,6 @@ with col2:
         elif not st.session_state.ideas:
             st.markdown("### 👋 Добро пожаловать на кухню ИИ-Шефа!")
             st.write("1. Отметьте продукты в меню слева (можно выбрать хоть весь холодильник — шеф сам отберет сочетаемые).")
-            st.write("2. Нажмите **«Подобрать 5 блюд на выбор»** и кликните на понравившийся вариант.")
-            st.write("3. Или переключитесь на **«Рацион на весь день»** для готового меню с фото и точным бюджетом.")
+            st.write("2. Нажмите Подобрать 5 блюд на выбор и кликните на понравившийся вариант.")
+            st.write("3. Или переключитесь на Рацион на весь день для готового меню с фото и точным бюджетом.")
             st.info("💡 Все открытые рецепты и рационы сохраняются в левой панели.")
