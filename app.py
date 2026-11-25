@@ -146,8 +146,8 @@ def fallback_dish_photo(keyword: str, title_ru: str = "") -> str:
         "pasta": m + "ustsqw1468250014.jpg", "spaghetti": m + "ustsqw1468250014.jpg", "macaroni": m + "ustsqw1468250014.jpg",
         "noodles": m + "1529446137.jpg", "wok": m + "1529446137.jpg",
         "soup": m + "1529446352.jpg", "borscht": m + "1529446352.jpg",
-        "salad": m + "wvpsxx1468256321.jpg", "rice": m + "xxpqsy1511452222.jpg", "pilaf": m + "xxpqsy1511452222.jpg",
-        "buckwheat": m + "xxpqsy1511452222.jpg", "potato": m + "vrspxv1511722107.jpg",
+        "salad": m + "wvpsxx1468256321.jpg",
+        "potato": m + "vrspxv1511722107.jpg",
         "fish": m + "1548772327.jpg", "salmon": m + "1548772327.jpg", "tuna": m + "1548772327.jpg",
         "shrimp": m + "1529445834.jpg", "seafood": m + "1529445834.jpg",
         "dessert": m + "wyrqqq1468233628.jpg", "cake": m + "wyrqqq1468233628.jpg"
@@ -158,7 +158,7 @@ def fallback_dish_photo(keyword: str, title_ru: str = "") -> str:
         "омлет": "omelette", "шакшук": "omelette", "яичн": "fried_eggs", "глазун": "fried_eggs",
         "шашлык": "kebab", "кебаб": "kebab", "суп": "soup", "борщ": "soup", "щи": "soup",
         "паст": "pasta", "макарон": "pasta", "спагетти": "pasta", "вок": "wok", "лапш": "wok",
-        "салат": "salad", "плов": "pilaf", "ризотто": "pilaf", "гречк": "buckwheat",
+        "салат": "salad", "плов": "biryani", "ризотто": "risotto", "рис": "fried_rice", "гречк": "buckwheat",
         "котлет": "cutlet", "тефтел": "cutlet", "рулет": "meatloaf", "стейк": "steak",
         "каша": "porridge", "овсян": "porridge", "блин": "pancake", "сырник": "pancake",
         "шаурм": "shawarma", "лаваш": "shawarma", "сэндвич": "sandwich", "бутерброд": "sandwich",
@@ -166,7 +166,10 @@ def fallback_dish_photo(keyword: str, title_ru: str = "") -> str:
     }
     for ru_stem, mapped_kw in ru_map.items():
         if ru_stem in t_low:
-            return photos[mapped_kw]
+            if mapped_kw in photos:
+                return photos[mapped_kw]
+            keyword = mapped_kw
+            break
 
     kw = keyword.lower().strip().replace(" ", "_")
     if kw in photos:
@@ -385,7 +388,7 @@ def fetch_day_ration(auth_key: str, ingredients: list, wishes: str, sport_mode: 
         "LUNCH_TITLE: Название обеда\nLUNCH_KW: soup\n"
         "LUNCH_INGS:\n- Куриное филе — 200 г\n- Картофель — 150 г\n- Морковь — 60 г\n"
         "LUNCH_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
-        "DINNER_TITLE: Название ужина\nDINNER_KW: pilaf\n"
+        "DINNER_TITLE: Название ужина\nDINNER_KW: biryani\n"
         "DINNER_INGS:\n- Куриное филе — 200 г\n- Рис — 100 г\n- Морковь — 50 г\n- Лук — 50 г\n"
         "DINNER_STEPS:\n1. Подробный шаг 1\n2. Подробный шаг 2\n"
         "TIP: Подробный совет диетолога"
